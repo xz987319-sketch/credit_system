@@ -1,0 +1,116 @@
+{% extends "base.html" %} {# 继承站点基础布局（包含顶部导航栏和侧边栏菜单） #}
+{% load static %} {# 加载静态文件标签，供 JS/CSS 引用使用 #}
+
+{# =============================================================================
+   员工信用卡申请页面
+
+   功能说明：
+   - 已登录员工为自己所属银行创建信用卡申请单
+   - 只能选择自己银行发行的卡产品（前端下拉 + 后端双重过滤）
+   - 所属银行由系统根据当前登录用户自动确定，前端只读展示，不可修改
+
+   上下文变量（由 views.employee.employee_apply_view 传递）：
+   - form          : EmployeeApplyForm 实例，含所有字段和错误信息
+   - products      : 当前用户银行的启用卡产品列表（用于判断是否为空）
+   - user_bank     : 当前用户所属的 Bank 实例
+   ============================================================================= #}
+
+{% block title %}信用卡申请{% endblock %} {# 页面标题 #}
+
+{% block content %} {# 页面主体内容开始 #}
+
+{# -------------------------------------------------------------------------
+   页面标题区
+   ------------------------------------------------------------------------- #}
+<h1 class="h4 mb-3">信用卡申请</h1> {# 页面大标题 #}
+
+{# -------------------------------------------------------------------------
+   无可用卡产品提示
+   ------------------------------------------------------------------------- #}
+{% if not products %} {# 若当前用户银行没有任何启用卡产品 #}
+    {# 用 Bootstrap info 提示框告知用户，而非展示空下拉框 #}
+    <div class="alert alert-info" role="alert">
+        <strong>当前暂无可用卡种，请联系管理员。</strong>
+        <br>
+        您所属的银行（<strong>{{ user_bank.bank_name }}</strong>）目前没有启用中的信用卡产品，
+        无法发起申请。如有疑问请联系银行管理员添加卡产品。
+    </div>
+    {# 提供返回申请列表的入口 #}
+    <a href="{% url 'apply:my_applications' %}" class="btn btn-outline-secondary">返回申请列表</a>
+{% else %} {# 有可用卡产品时正常展示表单 #}
+
+    {# -------------------------------------------------------------------------
+       业务说明卡片：告知员工申请规则
+       ------------------------------------------------------------------------- #}
+    <div class="alert alert-light border mb-3" role="alert">
+        <div class="mb-1">
+            <strong>所属银行：</strong>
+            {# 展示当前用户银行名称，后端确保 bank 字段不可伪造 #}
+            <span class="text-primary">{{ user_bank.bank_name }}</span>
+            <span class="text-muted small">（系统自动确认，无法修改）</span>
+        </div>
+        <div class="mb-0 text-muted small">
+            {# 友好提示：告知员工只能申请本行产品 #}
+            请选择上方银行发行的信用卡产品，仅展示本行可申请的卡种。
+        </div>
+    </div>
+
+    {# -------------------------------------------------------------------------
+       表单主体
+       ------------------------------------------------------------------------- #}
+    {# method="post"：提交数据到后端；novalidate：关闭浏览器原生校验，由 Django 处理 #}
+    <form method="post" novalidate>
+        {% csrf_token %} {# Django CSRF 令牌，防止跨站请求伪造攻击 #}
+
+        {# -------------------------------------------------------------------------
+           表单级错误展示区域
+           说明：clean() 中的安全校验失败（如卡种不属于本行）会显示在这里
+           ------------------------------------------------------------------------- #}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        {# -------------------------------------------------------------------------
+           逐字段渲染
+           field.name == 'bank' 时：只读文本框展示当前银行（前端用户无法修改）
+           field.name == 'amount' 时：带额度区间提示和实时校验反馈
+           其他字段：标准 Bootstrap 表单控件
+           ------------------------------------------------------------------------- #}
+        {% for field in form %}
+            {% if field.name == 'bank' %}
+                {# 所属银行字段：后端注入，前端只读展示，不允许用户修改 #}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    <p class="form-text text-muted small mb-0">此字段由系统根据您的账号自动确定，无需填写。</p>
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                </div>
+
+            {% elif field.name == 'amount' %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    <p class="form-text text-muted mb-1" id="amount-range-hint">请先选择卡种，选择后将显示可申请金额范围。</p>
+                    <div id="amount-live-feedback" class="small mt-1" aria-live="polite"></div>
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                </div>
+
+            {% else %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <button class="btn btn-primary w-100" type="submit">提交申请</button>
+    </form>
+
+{% endif %} {# endif products 结束 #}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/apply_amount_input.js' %}"></script>
+<script src="{% static 'js/post_confirm.js' %}"></script>
+
+{% endblock %}

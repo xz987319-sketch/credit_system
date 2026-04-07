@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load form_tags %}
+
+{% block title %}申请详情{% endblock %}
+
+{# 获取核心字段标签配置 #}
+{% get_core_field_labels as core_labels %}
+
+{% block content %}
+<h1 class="h4 mb-3">申请详情 #{{ application.id }}</h1>
+
+{# ====== 核心信息卡片 ====== #}
+<div class="card mb-3">
+    <div class="card-header">
+        <i class="bi bi-person me-1"></i>基本信息
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-2">
+                <strong>银行：</strong>{{ application.bank.bank_name }}（{{ application.bank.bank_code }}）
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>{{ core_labels.applicant_name|default:"申请人姓名" }}：</strong>{{ application.applicant_name }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>{{ core_labels.id_card|default:"身份证号" }}：</strong>{{ application.id_card }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>{{ core_labels.phone|default:"手机号码" }}：</strong>{{ application.phone }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>{{ core_labels.card_product|default:"申请卡种" }}：</strong>{{ application.card_product.product_name }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>申请金额（元）：</strong>{{ application.amount }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>状态：</strong>
+                <span class="badge bg-{% if application.status == 'issued' %}success{% elif application.status == 'rejected' %}danger{% elif application.status == 'returned' %}warning{% else %}secondary{% endif %}">
+                    {{ application.get_status_display }}
+                </span>
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>{{ core_labels.return_reason|default:"退回原因" }}：</strong>{{ application.return_reason|default:"—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>{{ core_labels.supplementary_note|default:"补充说明" }}：</strong>{{ application.supplementary_note|default:"—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>复审拒绝原因：</strong>{{ application.second_reject_reason|default:"—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>信审备注：</strong>{{ application.credit_remark|default:"—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>虚拟卡号：</strong>{{ application.card_number|default:"—" }}
+            </div>
+            <div class="col-md-6 mb-2">
+                <strong>创建时间：</strong>{{ application.created_at }}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ====== 发卡信息（仅已发卡时显示） ====== #}
+{% if application.status == 'issued' %}
+<div class="card mb-3 border-success">
+    <div class="card-header bg-success text-white">
+        <i class="bi bi-credit-card me-1"></i>发卡信息
+    </div>
+    <div class="card-body">
+        <p class="mb-1"><strong>虚拟卡号：</strong><span class="fs-5 font-monospace">{{ application.card_number }}</span></p>
+        {% if application.issue_data %}
+        <p class="mb-1"><strong>发卡额度（元）：</strong>{{ application.issue_data.issue_amount|default:"—" }}</p>
+        <p class="mb-1"><strong>发卡日期：</strong>{{ application.issue_data.issue_date|default:"—" }}</p>
+        <p class="mb-1"><strong>快照姓名：</strong>{{ application.issue_data.applicant_name|default:"—" }}</p>
+        <p class="mb-0"><strong>快照证件号：</strong>{{ application.issue_data.id_card|default:"—" }}</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{# ====== 动态表单字段（公共模板 - 只读模式） ====== #}
+{% if form_pages and form_data %}
+{% include "includes/_dynamic_fields.html" with mode="readonly" form_pages=form_pages form_data=form_data %}
+{% endif %}
+
+{# ====== 发卡数据比对 ====== #}
+{% if compare_rows %}
+<h2 class="h6 mt-4"><i class="bi bi-arrow-left-right me-1"></i>发卡数据比对</h2>
+<div class="table-responsive">
+<table class="table table-bordered table-sm">
+    <thead>
+        <tr>
+            <th>字段</th>
+            <th>原始申请</th>
+            <th>发卡快照</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for row in compare_rows %}
+        <tr>
+            <td>{{ row.label }}</td>
+            <td class="{% if row.mismatch %}table-mismatch{% endif %}">{{ row.original }}</td>
+            <td class="{% if row.mismatch %}table-mismatch{% endif %}">{{ row.issued }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endif %}
+
+<div class="mt-4">
+    <a class="btn btn-secondary" href="javascript:history.back()">
+        <i class="bi bi-arrow-left me-1"></i>返回
+    </a>
+</div>
+{% endblock %}

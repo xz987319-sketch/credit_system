@@ -1,0 +1,82 @@
+{% extends "application_review_detail.html" %}
+
+{% block title %}信审详情 - {{ application.id }}{% endblock %}
+
+{# 修复返回按钮 #}
+{% block back_button %}
+<a href="{% url 'apply:credit_pending' %}" class="btn btn-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>返回列表
+</a>
+{% endblock %}
+
+{# 审核操作按钮 #}
+{% block review_actions %}
+<div class="d-flex gap-2 flex-wrap">
+    {# 信审通过按钮 #}
+    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#passModal">
+        <i class="bi bi-shield-check me-1"></i>信审通过
+    </button>
+    {# 信审拒绝按钮 #}
+    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
+        <i class="bi bi-x-circle me-1"></i>信审拒绝
+    </button>
+</div>
+
+{# ====== 通过确认弹窗 ====== #}
+<div class="modal fade" id="passModal" tabindex="-1" aria-labelledby="passModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="passModalLabel">
+                    <i class="bi bi-question-circle me-1"></i>确认信审通过
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p class="mb-2">确认通过申请人 <strong>{{ application.applicant_name }}</strong> 的申请？</p>
+                <p class="text-muted small mb-0">通过后将生成虚拟卡号，完成发卡。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form method="post" action="{% url 'apply:credit_pass' application.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check me-1"></i>确认通过
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ====== 拒绝弹窗 ====== #}
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="rejectModalLabel">
+                    <i class="bi bi-x-octagon me-1"></i>信审拒绝
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+            </div>
+            <form method="post" action="{% url 'apply:credit_reject' application.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="mb-3">拒绝申请人 <strong>{{ application.applicant_name }}</strong> 的申请。</p>
+                    <div class="mb-3">
+                        <label for="id_reason" class="form-label">拒绝原因说明</label>
+                        <textarea name="reason" id="id_reason" class="form-control" rows="3" 
+                                  placeholder="请输入拒绝原因" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-x me-1"></i>确认拒绝
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

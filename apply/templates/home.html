@@ -1,0 +1,11 @@
+{% extends "base.html" %} {# 继承基础模板 #}
+{% block title %}首页{% endblock %} {# 页面标题 #}
+{% block content %} {# 主内容 #}
+<h1 class="h4 mb-3">欢迎使用信贷申请流程模拟系统</h1> {# 欢迎标题 #}
+<p class="text-muted">请通过左侧菜单进入与您角色匹配的功能模块。</p> {# 引导说明 #}
+<ul class="list-group"> {# 信息列表 #}
+    <li class="list-group-item">普通员工可查看本行申请并处理退回补充资料。</li> {# 角色说明 #}
+    <li class="list-group-item">银行审核员可进行初审与复审操作。</li> {# 审核员说明 #}
+    <li class="list-group-item">超级管理员可执行信审发卡并访问 /admin/ 管理基础数据。</li> {# 超管说明 #}
+</ul> {# 列表结束 #}
+{% endblock %} {# 块结束 #}

@@ -1,0 +1,17 @@
+{% extends "base.html" %} {# 继承 #}
+{% block title %}信审拒绝{% endblock %} {# 标题 #}
+{% block content %} {# 内容 #}
+<h1 class="h4 mb-3">信审拒绝 #{{ application.id }}</h1> {# 页眉 #}
+<form method="post"> {# POST #}
+    {% csrf_token %} {# 令牌 #}
+    {% for field in form %} {# 循环字段 #}
+        <div class="mb-3"> {# 间距 #}
+            <label class="form-label">{{ field.label }}</label> {# 标签 #}
+            {{ field }} {# 控件 #}
+            {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %} {# 校验信息 #}
+        </div> {# 容器 #}
+    {% endfor %} {# 结束 #}
+    <button class="btn btn-danger" type="submit">确认信审拒绝</button> {# 按钮 #}
+    <a class="btn btn-link" href="{% url 'apply:credit_pending' %}">返回列表</a> {# 返回 #}
+</form> {# 表单结束 #}
+{% endblock %} {# 块结束 #}

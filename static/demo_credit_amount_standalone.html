@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>申请金额输入演示（独立页面）</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, "Segoe UI", sans-serif; max-width: 480px; margin: 24px auto; padding: 0 16px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; }
+    select, input[type="text"] { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 6px; }
+    .hint { color: #666; font-size: 14px; margin: 6px 0; }
+    .feedback { min-height: 22px; font-size: 14px; margin-top: 6px; }
+    .feedback.ok { color: #198754; }
+    .feedback.err { color: #dc3545; }
+    button { margin-top: 16px; padding: 10px 20px; font-size: 16px; border: none; border-radius: 6px; background: #0d6efd; color: #fff; cursor: pointer; }
+    button:hover { background: #0b5ed7; }
+    .log { margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 6px; font-size: 14px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>信用卡申请金额（纯前端演示）</h1>
+  <p>与项目内 <code>apply_amount_input.js</code> 规则一致；卡种区间可自行改下方 <code>PRODUCTS</code>。</p>
+
+  <form id="demoForm" method="post" action="javascript:void(0)">
+    <div style="margin-bottom: 16px;">
+      <label for="card_product">卡种</label>
+      <select id="card_product" name="card_product" required>
+        <option value="">请选择</option>
+      </select>
+    </div>
+    <div style="margin-bottom: 16px;">
+      <label for="amount">申请金额（元）</label>
+      <input type="text" id="amount" name="amount" class="apply-amount-input" inputmode="decimal" autocomplete="off" placeholder="请输入申请金额">
+      <p class="hint" id="amount-range-hint">请先选择卡种。</p>
+      <div id="amount-live-feedback" class="feedback" aria-live="polite"></div>
+    </div>
+    <button type="submit">提交（演示）</button>
+  </form>
+  <div class="log" id="resultLog">提交结果将显示在这里。</div>
+
+  <script>
+    /* 示例卡种区间（与 seed_demo 中 CARD_SPECS 对应，可自行修改） */
+    var PRODUCTS = [
+      { id: "1", name: "普卡", min: 2000, max: 50000 },
+      { id: "2", name: "金卡", min: 10000, max: 100000 },
+      { id: "3", name: "白金卡", min: 50000, max: 200000 },
+      { id: "4", name: "钻石卡", min: 100000, max: 500000 }
+    ];
+
+    (function initSelect() {
+      var sel = document.getElementById("card_product");
+      PRODUCTS.forEach(function (p) {
+        var opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.name;
+        opt.setAttribute("data-credit-min", String(p.min));
+        opt.setAttribute("data-credit-max", String(p.max));
+        sel.appendChild(opt);
+      });
+    })();
+  </script>
+  <script>
+    /* 以下逻辑与 static/js/apply_amount_input.js 同步维护时可复制粘贴 */
+    (function () {
+      function fmtMoney(n) {
+        var x = Number(n);
+        if (!isFinite(x)) return String(n);
+        return x.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function getSelectedProductMeta(selectEl) {
+        if (!selectEl) return null;
+        var opt = selectEl.options[selectEl.selectedIndex];
+        if (!opt || !opt.value) return null;
+        var mn = opt.getAttribute("data-credit-min");
+        var mx = opt.getAttribute("data-credit-max");
+        if (mn == null || mx == null) return null;
+        return { min: parseFloat(mn), max: parseFloat(mx), label: opt.text.trim() };
+      }
+      function sanitizeAmountString(raw) {
+        var s = String(raw || "");
+        var out = "";
+        var dot = false;
+        for (var i = 0; i < s.length; i++) {
+          var c = s[i];
+          if (c >= "0" && c <= "9") {
+            if (dot) {
+              var frac = out.split(".")[1] || "";
+              if (frac.length >= 2) continue;
+            }
+            out += c;
+          } else if (c === ".") {
+            if (!dot) {
+              dot = true;
+              if (out === "") out = "0";
+              out += ".";
+            }
+          }
+        }
+        return out;
+      }
+      function parseAmountValue(s) {
+        if (!s || !String(s).trim()) return { ok: false, code: "empty" };
+        var t = String(s).trim();
+        if (t.startsWith(".")) t = "0" + t;
+        if (!/^\d+(\.\d{0,2})?$/.test(t)) {
+          if (t.indexOf(".") >= 0 && t.split(".")[1].length > 2) return { ok: false, code: "decimals" };
+          return { ok: false, code: "format" };
+        }
+        var v = parseFloat(t);
+        if (!isFinite(v)) return { ok: false, code: "format" };
+        if (v <= 0) return { ok: false, code: "nonpositive" };
+        return { ok: true, value: v, text: t };
+      }
+      function validateAgainstProduct(v, meta) {
+        if (!meta) return { ok: true };
+        if (v < meta.min || v > meta.max) {
+          return { ok: false, msg: "申请金额必须在 " + fmtMoney(meta.min) + " ～ " + fmtMoney(meta.max) + " 元之间。" };
+        }
+        return { ok: true };
+      }
+      function updateRangeHint(selectEl, hintEl) {
+        if (!hintEl) return;
+        var meta = getSelectedProductMeta(selectEl);
+        if (!meta) {
+          hintEl.textContent = "请先选择卡种，选择后将显示可申请金额范围。";
+          return;
+        }
+        hintEl.textContent = "可申请金额范围：" + fmtMoney(meta.min) + " ～ " + fmtMoney(meta.max) + " 元";
+      }
+      function updateLiveFeedback(inputEl, selectEl, feedbackEl) {
+        if (!feedbackEl) return;
+        var meta = getSelectedProductMeta(selectEl);
+        var raw = inputEl.value;
+        var parsed = parseAmountValue(raw);
+        feedbackEl.className = "feedback";
+        feedbackEl.textContent = "";
+        if (!raw.trim()) return;
+        if (!parsed.ok) {
+          feedbackEl.classList.add("err");
+          if (parsed.code === "decimals") feedbackEl.textContent = "金额最多保留两位小数。";
+          else if (parsed.code === "nonpositive") feedbackEl.textContent = "金额不能为 0 或负数。";
+          else feedbackEl.textContent = "请输入有效数字（仅 0-9 与小数点）。";
+          return;
+        }
+        var vr = validateAgainstProduct(parsed.value, meta);
+        if (!vr.ok) {
+          feedbackEl.classList.add("err");
+          feedbackEl.textContent = vr.msg;
+          return;
+        }
+        feedbackEl.classList.add("ok");
+        feedbackEl.textContent = "✓ 金额在允许范围内";
+      }
+      var form = document.getElementById("demoForm");
+      var selectEl = form.querySelector("#card_product");
+      var inputEl = form.querySelector("#amount");
+      var hintEl = document.getElementById("amount-range-hint");
+      var feedbackEl = document.getElementById("amount-live-feedback");
+      var logEl = document.getElementById("resultLog");
+      function refresh() {
+        updateRangeHint(selectEl, hintEl);
+        updateLiveFeedback(inputEl, selectEl, feedbackEl);
+      }
+      inputEl.addEventListener("beforeinput", function (e) {
+        if (e.data == null) return;
+        for (var i = 0; i < e.data.length; i++) {
+          var ch = e.data[i];
+          if ((ch < "0" || ch > "9") && ch !== ".") {
+            e.preventDefault();
+            return;
+          }
+        }
+      });
+      inputEl.addEventListener("input", function () {
+        var cur = inputEl.value;
+        var next = sanitizeAmountString(cur);
+        if (next !== cur) inputEl.value = next;
+        refresh();
+      });
+      inputEl.addEventListener("paste", function (e) {
+        e.preventDefault();
+        var text = (e.clipboardData || window.clipboardData).getData("text") || "";
+        inputEl.value = sanitizeAmountString(text);
+        refresh();
+      });
+      selectEl.addEventListener("change", refresh);
+      refresh();
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var raw = (inputEl.value || "").trim();
+        if (!selectEl.value) {
+          logEl.textContent = "请先选择卡种。";
+          return;
+        }
+        if (!raw) {
+          logEl.textContent = "申请金额不能为空。";
+          return;
+        }
+        var t = raw.startsWith(".") ? "0" + raw : raw;
+        if (!/^\d+(\.\d{0,2})?$/.test(t)) {
+          logEl.textContent = t.indexOf(".") >= 0 && t.split(".")[1].length > 2 ? "金额最多保留两位小数。" : "请输入有效数字。";
+          return;
+        }
+        var v = parseFloat(t);
+        if (!isFinite(v) || v <= 0) {
+          logEl.textContent = "金额不能为 0 或负数。";
+          return;
+        }
+        var meta = getSelectedProductMeta(selectEl);
+        var vr = validateAgainstProduct(v, meta);
+        if (!vr.ok) {
+          logEl.textContent = vr.msg;
+          return;
+        }
+        logEl.textContent = "校验通过（演示）：卡种=" + meta.label + "，金额=" + t + " 元\n实际 Django 项目请使用 H5ApplyForm.clean_amount 再次校验。";
+      });
+    })();
+  </script>
+</body>
+</html>

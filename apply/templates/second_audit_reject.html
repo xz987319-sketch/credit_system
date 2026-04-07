@@ -1,0 +1,17 @@
+{% extends "base.html" %} {# 基础 #}
+{% block title %}复审拒绝{% endblock %} {# 标题 #}
+{% block content %} {# 内容 #}
+<h1 class="h4 mb-3">复审拒绝 #{{ application.id }}</h1> {# 标题 #}
+<form method="post"> {# 表单 #}
+    {% csrf_token %} {# csrf #}
+    {% for field in form %} {# 字段 #}
+        <div class="mb-3"> {# 容器 #}
+            <label class="form-label">{{ field.label }}</label> {# 标签 #}
+            {{ field }} {# 输入 #}
+            {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %} {# 错误 #}
+        </div> {# div #}
+    {% endfor %} {# 结束 #}
+    <button class="btn btn-danger" type="submit">确认拒绝</button> {# 提交 #}
+    <a class="btn btn-link" href="{% url 'apply:pending_second' %}">返回</a> {# 链接 #}
+</form> {# 表单 #}
+{% endblock %} {# 块 #}

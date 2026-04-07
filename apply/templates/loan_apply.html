@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}贷款申请{% endblock %}
+
+{% block extra_css %}
+<style>
+    .loan-apply-container {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 32px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .loan-apply-header {
+        text-align: center;
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    .loan-apply-header h2 {
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 8px;
+    }
+    .loan-apply-header p {
+        color: #6c757d;
+        margin: 0;
+    }
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+    .form-control, .form-select {
+        padding: 12px 16px;
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        transition: all 0.2s;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    }
+    .btn-submit {
+        padding: 14px 32px;
+        font-size: 1.1rem;
+        font-weight: 500;
+        border-radius: 8px;
+        margin-top: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="loan-apply-container">
+    <div class="loan-apply-header">
+        <h2>贷款申请</h2>
+        <p>请填写以下信息提交贷款申请</p>
+    </div>
+
+    {# 友好提示：根据用户角色显示不同提示 #}
+    {% if is_superuser %}
+        <div class="alert alert-info mb-4">
+            <strong>管理员模式</strong>：您可以申请所有银行的卡产品。
+        </div>
+    {% elif user_bank %}
+        <div class="alert alert-info mb-4">
+            <strong>当前银行</strong>：{{ user_bank.bank_name }} ({{ user_bank.bank_code }})
+            <br>您只能申请本行的卡产品。
+        </div>
+    {% endif %}
+
+    {# 无产品时显示友好提示 #}
+    {% if not products %}
+        <div class="alert alert-warning">
+            当前暂无可用卡种，请联系管理员。
+        </div>
+    {% else %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="row g-3">
+                {% for field in form %}
+                    {% if field.name == 'amount' %}
+                        <div class="col-12">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            <p class="form-text text-muted mb-1" id="amount-range-hint">
+                                请先选择卡种，选择后将显示可申请金额范围。
+                            </p>
+                            <div id="amount-live-feedback" class="small mt-1" aria-live="polite"></div>
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger small">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="d-grid mt-4">
+                <button class="btn btn-primary btn-submit" type="submit">提交申请</button>
+            </div>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/apply_amount_input.js' %}"></script>
+{% endblock %}

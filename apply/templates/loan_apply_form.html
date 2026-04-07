@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}贷款申请{% endblock %}
+
+{% block extra_css %}
+<style>
+    .apply-container {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+    .back-btn {
+        display: inline-flex;
+        align-items: center;
+        color: #6c757d;
+        text-decoration: none;
+        margin-bottom: 24px;
+        font-size: 14px;
+    }
+    .back-btn:hover {
+        color: #0d6efd;
+    }
+    .apply-header {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        text-align: center;
+    }
+    .apply-header h2 {
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 8px;
+    }
+    .apply-header p {
+        color: #6c757d;
+        margin: 0;
+    }
+    .product-badge {
+        display: inline-block;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #fff;
+        margin-top: 12px;
+    }
+    .product-badge.gold { background: linear-gradient(135deg, #d4a853, #b8860b); }
+    .product-badge.platinum { background: linear-gradient(135deg, #4a5568, #2d3748); }
+    .product-badge.classic { background: linear-gradient(135deg, #3182ce, #2c5282); }
+    .apply-form {
+        background: white;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 8px;
+    }
+    .form-control, .form-select {
+        padding: 12px 16px;
+        border-radius: 8px;
+        border: 1px solid #ced4da;
+        transition: all 0.2s;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    }
+    .btn-submit {
+        padding: 14px 32px;
+        font-size: 1.1rem;
+        font-weight: 500;
+        border-radius: 8px;
+        margin-top: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="apply-container">
+    <a href="{% url 'apply:loan_product_list' %}" class="back-btn">
+        <span>&larr;</span>&nbsp;返回产品列表
+    </a>
+
+    <div class="apply-header">
+        <h2>贷款申请</h2>
+        <p>请填写以下信息提交贷款申请</p>
+        {% if selected_product %}
+        <div class="product-badge
+            {% if '金卡' in selected_product.product_type %}gold
+            {% elif '白金' in selected_product.product_type %}platinum
+            {% else %}classic{% endif %}">
+            {{ selected_product.product_name }}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="apply-form">
+        {% if is_superuser %}
+            <div class="alert alert-info mb-4">
+                <strong>管理员模式</strong>：您可以申请所有银行的卡产品。
+            </div>
+        {% elif user_bank %}
+            <div class="alert alert-info mb-4">
+                <strong>当前银行</strong>：{{ user_bank.bank_name }} ({{ user_bank.bank_code }})
+            </div>
+        {% endif %}
+
+        {% if not products %}
+            <div class="alert alert-warning">
+                当前暂无可用卡种，请返回产品列表重试。
+            </div>
+        {% else %}
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="row g-3">
+                    {% for field in form %}
+                        {% if field.name == 'amount' %}
+                            <div class="col-12">
+                                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                <p class="form-text text-muted mb-1" id="amount-range-hint">
+                                    请先选择卡种，选择后将显示可申请金额范围。
+                                </p>
+                                <div id="amount-live-feedback" class="small mt-1" aria-live="polite"></div>
+                                {% if field.errors %}
+                                    <div class="text-danger small">{{ field.errors }}</div>
+                                {% endif %}
+                            </div>
+                        {% else %}
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}
+                                    <div class="text-danger small">{{ field.errors }}</div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <div class="d-grid mt-4">
+                    <button class="btn btn-primary btn-submit" type="submit">提交申请</button>
+                </div>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/apply_amount_input.js' %}"></script>
+{% endblock %}

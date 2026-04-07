@@ -1,0 +1,304 @@
+{# ===================================================== #}
+{# 动态表单字段公共模板片段 #}
+{# 使用方式： #}
+{#   {% load form_tags %} #}
+{#   {% include "includes/_dynamic_fields.html" with mode="readonly" form_pages=form_pages form_data=form_data %} #}
+{#   {% include "includes/_dynamic_fields.html" with mode="editable" form_pages=form_pages form_data=form_data errors=form.errors %} #}
+{# ===================================================== #}
+{% load form_tags %}
+
+{# 核心字段列表（已在主表单中展示，此处不重复显示） #}
+{% get_core_field_keys as core_fields %}
+
+{# 遍历所有页面 #}
+{% for page in form_pages %}
+    {# 获取当前页面的字段，过滤启用状态并按排序字段排序 #}
+    {% with page.fields.all|dictsort:"sort_order" as sorted_fields %}
+
+    {# 检查是否有启用的字段 #}
+    {% with sorted_fields|length as total_fields %}
+
+    {% if total_fields > 0 %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <i class="bi bi-list-ul me-1"></i>{{ page.page_title }}
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for field in sorted_fields %}
+                    {# 仅处理启用字段且非核心字段 #}
+                    {% if field.is_active and field.field_key not in core_fields %}
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label text-muted small">
+                            {{ field.field_label }}
+                            {% if field.is_required %}<span class="text-danger">*</span>{% endif %}
+                        </label>
+
+                        {# ====== 只读模式 ====== #}
+                        {% if mode == 'readonly' %}
+                            {% with value=form_data|get_item:field.field_key %}
+                                {# 图片字段 #}
+                                {% if field.field_type == 'image' or value|slice:":22" == "data:image" %}
+                                    {% if value %}
+                                    <div>
+                                        <img src="{{ value }}" alt="{{ field.field_label }}"
+                                             class="img-thumbnail"
+                                             style="max-height: 150px; cursor: pointer;"
+                                             onclick="this.style.maxHeight=this.style.maxHeight=='none'?'150px':'none'">
+                                        <p class="small text-muted mt-1">点击图片可放大/缩小</p>
+                                    </div>
+                                    {% else %}
+                                    <div class="form-control bg-light text-muted">—</div>
+                                    {% endif %}
+
+                                {# 长文本 #}
+                                {% elif field.field_type == 'textarea' or value|length > 100 %}
+                                    <div class="form-control bg-light text-dark" style="min-height: 60px; overflow-y: auto;" readonly>{{ value|default:"—" }}</div>
+
+                                {# 日期 #}
+                                {% elif field.field_type == 'date' and value %}
+                                    <div class="form-control bg-light text-dark">{{ value }}</div>
+
+                                {# 下拉/单选：显示选项文字 #}
+                                {% elif field.field_type == 'select' or field.field_type == 'radio' %}
+                                    {% with option_label=field.options|get_option_label:value %}
+                                    <div class="form-control bg-light text-dark">{{ option_label|default:value|default:"—" }}</div>
+                                    {% endwith %}
+
+                                {# 复选框 #}
+                                {% elif field.field_type == 'checkbox' %}
+                                    {% with checkbox_labels=field.options|get_checkbox_labels:value %}
+                                    <div class="form-control bg-light text-dark">{{ checkbox_labels|default:"—" }}</div>
+                                    {% endwith %}
+
+                                {# 普通字段 #}
+                                {% else %}
+                                    <div class="form-control bg-light text-dark">{{ value|default:"—" }}</div>
+                                {% endif %}
+                            {% endwith %}
+
+                        {# ====== 编辑模式 ====== #}
+                        {% else %}
+                            {# 判断是否是第一页（基本信息页），如果是则强制只读 #}
+                            {% with form_pages|index:0 as first_form_page %}
+                            {% with value=form_data|get_item:field.field_key %}
+                            {% with first_form_page|is_same_page:page as is_basic_info_page %}
+                            {% with is_basic_info_page|or_readonly:field.is_readonly as is_readonly_field %}
+
+                                {# 文本输入 #}
+                                {% if field.field_type == 'text' %}
+                                    <input type="text"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}{% if field.validation_rule == 'name' %} js-name-field{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           id="field_{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder }}"
+                                           {% if field.max_length %}maxlength="{{ field.max_length }}"{% endif %}
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
+
+                                {# 多行文本 #}
+                                {% elif field.field_type == 'textarea' %}
+                                    <textarea class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                              name="{{ field.field_key }}"
+                                              rows="3"
+                                              placeholder="{{ field.placeholder }}"
+                                              {% if is_readonly_field %}readonly{% endif %}
+                                              {% if field.is_required and not is_readonly_field %}required{% endif %}>{{ value|default:'' }}</textarea>
+
+                                {# 数字输入 #}
+                                {% elif field.field_type == 'number' %}
+                                    <input type="number"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder }}"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+
+                                {# 日期输入 #}
+                                {% elif field.field_type == 'date' %}
+                                    <input type="text"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'YYYYMMDD' }}"
+                                           maxlength="8"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+
+                                {# 手机号 #}
+                                {% elif field.field_type == 'phone' or field.validation_rule == 'phone' %}
+                                    <input type="tel"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'请输入手机号' }}"
+                                           maxlength="{{ field.max_length|default:'11' }}"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+
+                                {# 身份证号 #}
+                                {% elif field.field_type == 'id_card' or field.validation_rule == 'id_card' %}
+                                    <input type="text"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'请输入18位身份证号' }}"
+                                           maxlength="{{ field.max_length|default:'18' }}"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+
+                                {# 姓名 #}
+                                {% elif field.field_type == 'name' or field.validation_rule == 'name' %}
+                                    <input type="text"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'请输入姓名' }}"
+                                           maxlength="{{ field.max_length|default:'30' }}"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+
+                                {# 姓名拼音 #}
+                                {% elif field.field_type == 'name_pinyin' %}
+                                    <input type="text"
+                                           class="form-control bg-light text-secondary"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="根据姓名自动生成"
+                                           readonly>
+
+                                {# 金额 #}
+                                {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
+                                    <input type="text"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'请输入申请金额' }}"
+                                           maxlength="{{ field.max_length|default:'12' }}"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+
+
+                                {# 下拉框 #}
+                                {% elif field.field_type == 'select' %}
+                                    {# 只读时添加隐藏字段保存值（disabled字段不提交） #}
+                                    {% if is_readonly_field %}
+                                    <input type="hidden" name="{{ field.field_key }}" value="{{ value|default:'' }}">
+                                    {% endif %}
+                                    <select class="form-select{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                            name="{{ field.field_key }}"
+                                            {% if is_readonly_field %}disabled{% endif %}
+                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                        <option value="">请选择</option>
+                                        {% for option in field.options|parse_options %}
+                                        <option value="{{ option.value }}" {% if value == option.value %}selected{% endif %}>
+                                            {{ option.label }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+
+                                {# 单选框 #}
+                                {% elif field.field_type == 'radio' %}
+                                    {# 只读时添加隐藏字段保存值 #}
+                                    {% if is_readonly_field %}
+                                    <input type="hidden" name="{{ field.field_key }}" value="{{ value|default:'' }}">
+                                    {% endif %}
+                                    <div class="mt-2">
+                                        {% for option in field.options|parse_options %}
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio"
+                                                   name="{{ field.field_key }}"
+                                                   id="{{ field.field_key }}_{{ forloop.counter }}"
+                                                   value="{{ option.value }}"
+                                                   {% if value == option.value %}checked{% endif %}
+                                                   {% if is_readonly_field %}disabled{% endif %}
+                                                   {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                            <label class="form-check-label{% if is_readonly_field %} text-secondary{% endif %}" for="{{ field.field_key }}_{{ forloop.counter }}">
+                                                {{ option.label }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                {# 复选框 #}
+                                {% elif field.field_type == 'checkbox' %}
+                                    {# 只读时添加隐藏字段保存值（复选框可能多值） #}
+                                    {% if is_readonly_field %}
+                                    {% for option in field.options|parse_options %}
+                                        {% if value|has_checkbox_value:option.value %}
+                                        <input type="hidden" name="{{ field.field_key }}" value="{{ option.value }}">
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% endif %}
+                                    <div class="mt-2">
+                                        {% for option in field.options|parse_options %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                   name="{{ field.field_key }}"
+                                                   id="{{ field.field_key }}_{{ forloop.counter }}"
+                                                   value="{{ option.value }}"
+                                                   {% if value|has_checkbox_value:option.value %}checked{% endif %}
+                                                   {% if is_readonly_field %}disabled{% endif %}>
+                                            <label class="form-check-label{% if is_readonly_field %} text-secondary{% endif %}" for="{{ field.field_key }}_{{ forloop.counter }}">
+                                                {{ option.label }}
+                                            </label>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+
+                                {# 文件上传 #}
+                                {% elif field.field_type == 'file' %}
+                                    {# 只读时添加隐藏字段保存值 #}
+                                    {% if is_readonly_field and value %}
+                                    <input type="hidden" name="{{ field.field_key }}" value="{{ value }}">
+                                    {% endif %}
+                                    <input type="file"
+                                           class="form-control"
+                                           name="{{ field.field_key }}"
+                                           {% if is_readonly_field %}disabled{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+
+                                {# 图片上传 #}
+                                {% elif field.field_type == 'image' %}
+                                    {# 图片预览 #}
+                                    {% if value %}
+                                    <div class="image-preview-container mb-2" id="{{ field.field_key }}_preview_container">
+                                        <img src="{{ value }}" class="img-thumbnail"
+                                             style="max-width: 200px; max-height: 150px;">
+                                        <p class="small text-muted">已有图片，如需更换请重新选择</p>
+                                    </div>
+                                    {% endif %}
+                                    {# 隐藏的 base64 存储字段 #}
+                                    <input type="hidden" name="{{ field.field_key }}_base64" id="{{ field.field_key }}_base64" value="{{ value|default:'' }}">
+                                    {# 文件选择 #}
+                                    <input type="file"
+                                           class="form-control"
+                                           name="{{ field.field_key }}"
+                                           accept="image/*"
+                                           onchange="handleImageSelect(this, '{{ field.field_key }}_preview_container', '{{ field.field_key }}_base64')"
+                                           id="{{ field.field_key }}_file"
+                                           {% if is_readonly_field %}disabled{% endif %}
+                                           {% if field.is_required and not value and not is_readonly_field %}required{% endif %}>
+
+                                {% endif %}
+
+                            {% endwith %}
+                            {% endwith %}
+                            {% endwith %}
+                            {% endwith %}
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% endwith %}
+{% endfor %}

@@ -1,0 +1,47 @@
+/* 控制管理后台表单字段宽度 */
+
+/* 排序字段 - 内联表格样式 */
+.form-row .field-sort_order input,
+.djangodmin .field-sort_order input {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+}
+
+/* 最大长度字段 - 内联表格样式 */
+.form-row .field-max_length input,
+.djangodmin .field-max_length input {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+}
+
+/* 图片张数字段 - 内联表格样式 */
+.form-row .field-min_photos input,
+.form-row .field-max_photos input,
+.djangodmin .field-min_photos input,
+.djangodmin .field-max_photos input {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+}
+
+/* 子表单字段页面的字段样式 */
+.field-sort_order input,
+.field-max_length input,
+.field-min_photos input,
+.field-max_photos input {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+}
+
+/* 表头文字换行 */
+th.column-min_photos,
+th.column-max_photos,
+th.column-max_length {
+    white-space: normal !important;
+    word-break: break-all !important;
+    max-width: 50px;
+    line-height: 1.2;
+}

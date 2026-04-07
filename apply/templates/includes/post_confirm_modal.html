@@ -1,0 +1,16 @@
+{# 二次确认弹窗：供 base 与独立 H5 页包含 #}
+<div class="modal fade" id="postSubmitConfirmModal" tabindex="-1" aria-labelledby="postSubmitConfirmTitle" aria-hidden="true"> {# 模态根节点 #}
+    <div class="modal-dialog modal-dialog-centered"> {# 垂直居中对话框 #}
+        <div class="modal-content"> {# 内容容器 #}
+            <div class="modal-header"> {# 头部 #}
+                <h5 class="modal-title" id="postSubmitConfirmTitle">请确认</h5> {# 标题 #}
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button> {# 关闭叉 #}
+            </div> {# 头结束 #}
+            <div class="modal-body">确定要提交吗？</div> {# 提示文案 #}
+            <div class="modal-footer"> {# 底部按钮区 #}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button> {# 取消 #}
+                <button type="button" class="btn btn-primary" id="postSubmitConfirmOk">确认</button> {# 确认提交 #}
+            </div> {# 底结束 #}
+        </div> {# content #}
+    </div> {# dialog #}
+</div> {# modal #}

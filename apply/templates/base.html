@@ -1,0 +1,69 @@
+{% load static %} {# 加载静态文件标签库供样式引用 #}
+<!DOCTYPE html> {# 声明 HTML5 文档类型 #}
+<html lang="zh-CN"> {# 设置页面语言为简体中文 #}
+<head> {# 头部区域开始 #}
+    <meta charset="utf-8"> {# 指定字符编码为 UTF-8 #}
+    <meta name="viewport" content="width=device-width, initial-scale=1"> {# 移动端视口适配 #}
+    <title>{% block title %}信贷流程模拟{% endblock %}</title> {# 可被子模板覆盖的标题块 #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"> {# 引入 Bootstrap 5 样式 #}
+    <link href="{% static 'app.css' %}" rel="stylesheet"> {# 引入项目自定义样式 #}
+    <link href="{% static 'admin_custom.css' %}" rel="stylesheet"> {# 引入紧凑表单间距样式 #}
+</head> {# 头部结束 #}
+<body class="bg-light"> {# 页面主体使用浅色背景 #}
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-3"> {# 顶部导航栏 #}
+    <div class="container-fluid"> {# 全宽容器 #}
+        <a class="navbar-brand" href="{% url 'apply:home' %}">信贷模拟系统</a> {# 品牌链接回首页 #}
+        {% if request.user.is_authenticated %} {# 已登录显示用户名与登出 #}
+            <span class="navbar-text text-white me-3">你好，{{ request.user.username }}</span> {# 问候语 #}
+            <form class="d-inline no-post-confirm" method="post" action="{% url 'apply:logout' %}"> {# 登出不触发全局二次确认 #}
+                {% csrf_token %} {# CSRF 令牌 #}
+                <button class="btn btn-outline-light btn-sm" type="submit">退出</button> {# 登出按钮 #}
+            </form> {# 表单结束 #}
+        {% endif %} {# 登录判断结束 #}
+    </div> {# 容器结束 #}
+</nav> {# 导航结束 #}
+<div class="container-fluid"> {# 主布局容器 #}
+    <div class="row"> {# Bootstrap 行 #}
+        {% if request.user.is_authenticated %} {# 侧边栏仅登录可见 #}
+        <aside class="col-lg-2 col-md-3 mb-3"> {# 左侧导航占列 #}
+            <div class="list-group"> {# 列表组展示菜单 #}
+                <a class="list-group-item list-group-item-action" href="{% url 'apply:home' %}">首页</a> {# 首页菜单 #}
+                {% if request.user.is_superuser %} {# 超级管理员显示全部业务入口 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:my_applications' %}">我的申请</a> {# 全行申请列表 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:loan_product_list' %}">贷款申请</a> {# 贷款申请 - 卡种列表 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:pending_first' %}">待初审</a> {# 初审 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:pending_second' %}">待复审</a> {# 复审 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:credit_pending' %}">待信审</a> {# 信审 #}
+                    <a class="list-group-item list-group-item-action" href="/admin/">后台管理</a> {# Admin #}
+                {% elif request.user.role == 'quality_inspector' %} {# 审核员：只显示审核功能 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:pending_first' %}">待初审</a> {# 初审队列 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:pending_second' %}">待复审</a> {# 复审队列 #}
+                {% elif request.user.bank_id %} {# 普通员工：我的申请 + 贷款申请 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:my_applications' %}">我的申请</a> {# 本行申请 #}
+                    <a class="list-group-item list-group-item-action" href="{% url 'apply:loan_product_list' %}">贷款申请</a> {# 贷款申请 - 卡种列表 #}
+                {% endif %} {# 分支结束 #}
+            </div> {# 列表组结束 #}
+        </aside> {# 侧边栏结束 #}
+        <main class="col-lg-10 col-md-9"> {# 主内容区域 #}
+        {% else %} {# 未登录用户不显示侧栏占满宽 #}
+        <main class="col-12"> {# 全宽主区域 #}
+        {% endif %} {# 登录分支结束 #}
+            {% if messages %} {# 若有消息则循环展示 #}
+                {% for message in messages %} {# 遍历消息列表 #}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert"> {# Bootstrap 提示框（error 映射为 danger） #}
+                        {{ message }} {# 输出消息文本 #}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button> {# 关闭按钮 #}
+                    </div> {# 提示结束 #}
+                {% endfor %} {# 循环结束 #}
+            {% endif %} {# 消息判断结束 #}
+            {% block content %}{% endblock %} {# 子模板内容占位 #}
+        </main> {# 主区域结束 #}
+    </div> {# 行结束 #}
+</div> {# 容器结束 #}
+{% include "includes/post_confirm_modal.html" %} {# 全站 POST 二次确认弹窗 #}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script> {# 引入 Bootstrap JS 含弹窗组件 #}
+<script src="{% static 'js/apply_amount_input.js' %}"></script> {# 申请金额 text 输入联动（无 amount 字段时脚本自动跳过） #}
+<script src="{% static 'js/post_confirm.js' %}"></script> {# POST 提交前确认逻辑 #}
+{% block extra_js %}{% endblock %} {# 额外脚本占位 #}
+</body> {# body 结束 #}
+</html> {# 文档结束 #}

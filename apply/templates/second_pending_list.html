@@ -1,0 +1,44 @@
+{% extends "base.html" %} {# 基础模板 #}
+{% load form_tags %}
+{% block title %}待复审{% endblock %} {# 标题 #}
+
+{# 获取核心字段标签配置 #}
+{% get_core_field_labels as core_labels %}
+
+{% block content %} {# 内容 #}
+<h1 class="h4 mb-3">待复审列表</h1> {# 页眉 #}
+<div class="table-responsive"> {# 容器 #}
+<table class="table table-hover table-sm"> {# 表格 #}
+    <thead><tr><th>编号</th><th>{{ core_labels.applicant_name|default:"申请人姓名" }}</th><th>申请金额（元）</th><th>初审时间</th><th>操作</th></tr></thead> {# 表头 #}
+    <tbody> {# 表体 #}
+    {% for row in page_obj %} {# 循环 #}
+        <tr> {# 行 #}
+            <td>{{ row.id }}</td> {# id #}
+            <td>{{ row.applicant_name }}</td> {# 姓名 #}
+            <td>{{ row.amount }}</td> {# 额度 #}
+            <td>{{ row.init_audit_time }}</td> {# 初审时间 #}
+            <td class="d-flex flex-wrap gap-1"> {# 操作 #}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'apply:pending_second_detail' row.id %}">
+                    <i class="bi bi-eye"></i> 详情
+                </a>
+                <form method="post" action="{% url 'apply:pending_second_pass' row.id %}"> {# 通过 #}
+                    {% csrf_token %} {# csrf #}
+                    <button class="btn btn-success btn-sm" type="submit">通过</button> {# 按钮 #}
+                </form> {# 表单 #}
+                <a class="btn btn-outline-danger btn-sm" href="{% url 'apply:pending_second_reject' row.id %}">拒绝</a> {# 拒绝页 #}
+            </td> {# 操作结束 #}
+        </tr> {# 行结束 #}
+    {% empty %} {# 空 #}
+        <tr><td colspan="5" class="text-center text-muted">暂无待复审申请</td></tr> {# 提示 #}
+    {% endfor %} {# 结束 #}
+    </tbody> {# 表体 #}
+</table> {# 表格 #}
+</div> {# 容器 #}
+{% if page_obj.has_other_pages %} {# 分页 #}
+<nav><ul class="pagination"> {# ul #}
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一页</a></li>{% endif %} {# 上 #}
+    <li class="page-item disabled"><span class="page-link">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li> {# 页码 #}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">下一页</a></li>{% endif %} {# 下 #}
+</ul></nav> {# nav #}
+{% endif %} {# if #}
+{% endblock %} {# block #}

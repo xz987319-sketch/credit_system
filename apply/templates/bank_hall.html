@@ -1,0 +1,214 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>银行大厅 - 选择信用卡</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{% static 'app.css' %}" rel="stylesheet">
+    <style>
+        body {
+            background: #f5f6f8;
+        }
+        /* 顶部提示语 */
+        .top-tip {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 16px 20px;
+            text-align: center;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .top-tip .icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        /* 银行卡片 */
+        .bank-section {
+            margin-bottom: 24px;
+        }
+        .bank-header {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+        }
+        .bank-logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 18px;
+            margin-right: 12px;
+        }
+        .bank-info {
+            flex: 1;
+        }
+        .bank-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1a202c;
+            margin-bottom: 2px;
+        }
+        .bank-count {
+            font-size: 12px;
+            color: #999;
+        }
+        .bank-arrow {
+            color: #ccc;
+            font-size: 20px;
+        }
+        /* 热门卡片展示 */
+        .featured-cards {
+            padding: 16px 20px;
+            background: #fff;
+        }
+        .featured-card {
+            background: linear-gradient(135deg, var(--card-bg, #f8f9fa) 0%, var(--card-bg-end, #e9ecef) 100%);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-left: 4px solid var(--brand-color, #3182ce);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .featured-card:last-child {
+            margin-bottom: 0;
+        }
+        .featured-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .card-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .card-type-badge.gold { background: linear-gradient(135deg, #d4a853, #b8860b); }
+        .card-type-badge.platinum { background: linear-gradient(135deg, #4a5568, #2d3748); }
+        .card-type-badge.classic { background: linear-gradient(135deg, #3182ce, #2c5282); }
+        .card-type-badge.diamond { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+        .card-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1a202c;
+            margin-bottom: 4px;
+        }
+        .card-desc {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        /* 查看更多按钮 */
+        .view-more {
+            display: block;
+            text-align: center;
+            padding: 12px;
+            background: #fff;
+            color: var(--brand-color, #3182ce);
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            border-top: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        .view-more:hover {
+            background: #f8f9fa;
+            color: var(--brand-color, #3182ce);
+        }
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+
+{# 顶部提示语 #}
+<div class="top-tip">
+    <div class="icon">🏦</div>
+    <div>选择银行，查看该行所有信用卡</div>
+    <div style="font-size:12px; opacity:0.8; margin-top:4px;">点击下方卡片，立即申请</div>
+</div>
+
+<div class="container py-3">
+    {% if banks %}
+        {% for item in banks %}
+        <div class="bank-section">
+            {# 银行头部 #}
+            <div class="bank-header" onclick="location.href='{% url 'apply:bank_card_list' item.bank.id %}'">
+                <div class="bank-logo" style="background: {{ item.bank.brand_color }};">
+                    {{ item.bank.bank_name|slice:":1" }}
+                </div>
+                <div class="bank-info">
+                    <div class="bank-name">{{ item.bank.bank_name }}</div>
+                    <div class="bank-count">共 {{ item.total_count }} 张信用卡</div>
+                </div>
+                <div class="bank-arrow">›</div>
+            </div>
+            
+            {# 热门卡片 #}
+            <div class="featured-cards">
+                {% for product in item.featured_cards %}
+                <div class="featured-card" 
+                     style="--brand-color: {{ item.bank.brand_color }}; --card-bg: {{ item.bank.brand_color }}18; --card-bg-end: {{ item.bank.brand_color }}08;"
+                     onclick="location.href='{% url 'apply:card_product_detail' product.pk %}'">
+                    <span class="card-type-badge
+                        {% if '金卡' in product.product_type %}gold
+                        {% elif '白金' in product.product_type %}platinum
+                        {% elif '钻石' in product.product_type %}diamond
+                        {% else %}classic{% endif %}">
+                        {{ product.product_type }}
+                    </span>
+                    <div class="card-name">{{ product.product_name }}</div>
+                    {% if product.product_desc %}
+                    <div class="card-desc">{{ product.product_desc|truncatechars:60 }}</div>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-3">
+                    暂无可申请的信用卡
+                </div>
+                {% endfor %}
+            </div>
+            
+            {# 查看更多 #}
+            {% if item.total_count > 2 %}
+            <a href="{% url 'apply:bank_card_list' item.bank.id %}" class="view-more" style="--brand-color: {{ item.bank.brand_color }};">
+                查看全部 {{ item.total_count }} 张卡片 ›
+            </a>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <div class="icon">📋</div>
+            <div>暂无可申请的信用卡</div>
+            <div style="font-size:12px; margin-top:8px;">请联系管理员配置银行和卡产品</div>
+        </div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

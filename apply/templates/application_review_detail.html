@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load form_tags %}
+
+{% block title %}申请详情 - {{ application.id }}{% endblock %}
+
+{# 获取核心字段标签配置 #}
+{% get_core_field_labels as core_labels %}
+
+{% block content %}
+{# ====== 页面头部 ====== #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">
+        <i class="bi bi-file-earmark-text me-2"></i>申请详情 #{{ application.id }}
+    </h1>
+    {% block back_button %}
+    <a href="{% url back_url %}" class="btn btn-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>返回列表
+    </a>
+    {% endblock %}
+</div>
+
+{# ====== 状态标签 ====== #}
+<div class="mb-3">
+    {% if application.status == 'pending_first' %}
+        <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>待初审</span>
+    {% elif application.status == 'pending_second' %}
+        <span class="badge bg-info"><i class="bi bi-arrow-repeat me-1"></i>待复审</span>
+    {% elif application.status == 'pending_credit' %}
+        <span class="badge bg-primary"><i class="bi bi-shield-check me-1"></i>待信审</span>
+    {% elif application.status == 'approved' %}
+        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>已通过</span>
+    {% elif application.status == 'rejected' %}
+        <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>已拒绝</span>
+    {% elif application.status == 'returned' %}
+        <span class="badge bg-warning text-dark"><i class="bi bi-arrow-return me-1"></i>已退回</span>
+    {% else %}
+        <span class="badge bg-secondary">{{ application.get_status_display }}</span>
+    {% endif %}
+
+    {% if application.return_reason %}
+    <span class="badge bg-warning text-dark ms-2">
+        <i class="bi bi-exclamation-triangle me-1"></i>退回原因：{{ application.return_reason }}
+    </span>
+    {% endif %}
+</div>
+
+{# ====== 核心申请信息 ====== #}
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <i class="bi bi-person-badge me-1"></i>申请人信息
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted small">{{ core_labels.applicant_name|default:"申请人姓名" }}</label>
+                <div class="form-control bg-light">{{ application.applicant_name }}</div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted small">{{ core_labels.id_card|default:"身份证号" }}</label>
+                <div class="form-control bg-light">{{ application.id_card }}</div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted small">{{ core_labels.phone|default:"手机号码" }}</label>
+                <div class="form-control bg-light">{{ application.phone }}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted small">所属银行</label>
+                <div class="form-control bg-light">{{ application.bank.bank_name|default:"—" }}</div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted small">{{ core_labels.card_product|default:"申请卡种" }}</label>
+                <div class="form-control bg-light">{{ application.card_product.product_name|default:"—" }}</div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted small">申请金额（元）</label>
+                <div class="form-control bg-light">{{ application.amount|default:"—" }}</div>
+            </div>
+        </div>
+        {% if application.supplementary_note %}
+        <div class="row">
+            <div class="col-12 mb-3">
+                <label class="form-label text-muted small">{{ core_labels.supplementary_note|default:"补充说明" }}</label>
+                <div class="form-control bg-light" style="min-height: 60px;">{{ application.supplementary_note }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# ====== 动态表单字段（公共模板 - 只读模式） ====== #}
+{% if form_pages %}
+    {% include "includes/_dynamic_fields.html" with mode="readonly" %}
+{% endif %}
+
+{# ====== 操作区域 ====== #}
+{% if show_actions %}
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary text-white">
+        <i class="bi bi-gear me-1"></i>审核操作
+    </div>
+    <div class="card-body">
+        {% block review_actions %}
+        {% endblock %}
+    </div>
+</div>
+{% endif %}
+
+{# ====== 审核记录时间线 ====== #}
+{% if application.init_audit_time or application.second_audit_time or application.credit_audit_time %}
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-clock-history me-1"></i>审核记录
+    </div>
+    <div class="card-body">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-calendar-plus me-2 text-muted"></i>提交时间</span>
+                <span class="text-muted">{{ application.created_at }}</span>
+            </li>
+            {% if application.init_audit_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-check-circle me-2 text-success"></i>初审时间</span>
+                <span class="text-muted">{{ application.init_audit_time }}</span>
+            </li>
+            {% endif %}
+            {% if application.second_audit_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-check-circle me-2 text-info"></i>复审时间</span>
+                <span class="text-muted">{{ application.second_audit_time }}</span>
+            </li>
+            {% endif %}
+            {% if application.credit_audit_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-shield-check me-2 text-primary"></i>信审时间</span>
+                <span class="text-muted">{{ application.credit_audit_time }}</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

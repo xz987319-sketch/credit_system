@@ -1,0 +1,9 @@
+{% extends "admin/change_form.html" %}
+{% load i18n static %}
+
+{# 继承 Unfold 的 change_form，追加自定义 JS 以翻译 filter_horizontal 双栏选择器文字 #}
+
+{% block extrahead %}
+    {{ block.super }}
+    <script src="{% static 'admin_custom.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %} {# 继承基础布局 #}
+{% load form_tags %}
+{% block title %}待初审{% endblock %} {# 页面标题 #}
+
+{# 获取核心字段标签配置 #}
+{% get_core_field_labels as core_labels %}
+
+{% block content %} {# 主内容区域 #}
+<h1 class="h4 mb-3">待初审列表</h1> {# 标题 #}
+<div class="table-responsive"> {# 表格容器 #}
+<table class="table table-hover table-sm"> {# 表格 #}
+    <thead><tr><th>编号</th><th>{{ core_labels.applicant_name|default:"申请人姓名" }}</th><th>申请金额（元）</th><th>{{ core_labels.card_product|default:"申请卡种" }}</th><th>提交时间</th><th>操作</th></tr></thead> {# 表头 #}
+    <tbody> {# 表体 #}
+    {% for row in page_obj %} {# 遍历记录 #}
+        <tr> {# 数据行 #}
+            <td>{{ row.id }}</td> {# 编号 #}
+            <td>{{ row.applicant_name }}</td> {# 姓名 #}
+            <td>{{ row.amount }}</td> {# 额度 #}
+            <td>{{ row.card_product.product_name }}</td> {# 产品名 #}
+            <td>{{ row.created_at }}</td> {# 时间 #}
+            <td class="d-flex flex-wrap gap-1"> {# 操作按钮组 #}
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'apply:pending_first_detail' row.id %}">
+                    <i class="bi bi-eye"></i> 详情
+                </a>
+                <form method="post" action="{% url 'apply:pending_first_pass' row.id %}"> {# 通过表单 #}
+                    {% csrf_token %} {# 令牌 #}
+                    <button class="btn btn-success btn-sm" type="submit">通过</button> {# 通过按钮 #}
+                </form> {# 表单结束 #}
+                <a class="btn btn-outline-danger btn-sm" href="{% url 'apply:pending_first_return' row.id %}">退回</a> {# 跳转填写退回原因 #}
+            </td> {# 操作列结束 #}
+        </tr> {# 行结束 #}
+    {% empty %} {# 空数据 #}
+        <tr><td colspan="6" class="text-center text-muted">暂无待初审申请</td></tr> {# 提示 #}
+    {% endfor %} {# 结束循环 #}
+    </tbody> {# 表体结束 #}
+</table> {# 表格结束 #}
+</div> {# 容器结束 #}
+{% if page_obj.has_other_pages %} {# 分页 #}
+<nav><ul class="pagination"> {# 分页导航 #}
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一页</a></li>{% endif %} {# 上一页 #}
+    <li class="page-item disabled"><span class="page-link">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li> {# 信息 #}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">下一页</a></li>{% endif %} {# 下一页 #}
+</ul></nav> {# 导航结束 #}
+{% endif %} {# 分页条件 #}
+{% endblock %} {# 块结束 #}

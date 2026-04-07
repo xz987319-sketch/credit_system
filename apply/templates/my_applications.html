@@ -1,0 +1,70 @@
+{% extends "base.html" %} {# 继承布局 #}
+{% load form_tags %}
+{% block title %}我的申请{% endblock %} {# 标题 #}
+
+{# 获取核心字段标签配置 #}
+{% get_core_field_labels as core_labels %}
+
+{% block content %} {# 内容 #}
+<h1 class="h4 mb-3">我的申请</h1> {# 页眉 #}
+<form class="row g-2 mb-3" method="get"> {# GET 搜索表单 #}
+    <div class="col-md-4"> {# 关键字列 #}
+        <input class="form-control" name="q" value="{{ keyword }}" placeholder="姓名或身份证"> {# 搜索框 #}
+    </div> {# 列结束 #}
+    <div class="col-md-3"> {# 状态下拉 #}
+        <select class="form-select" name="status"> {# 状态选择 #}
+            <option value="">全部状态</option> {# 默认项 #}
+            <option value="pending_first" {% if status == 'pending_first' %}selected{% endif %}>待初审</option> {# 选项 #}
+            <option value="pending_second" {% if status == 'pending_second' %}selected{% endif %}>待复审</option> {# 选项 #}
+            <option value="credit_ing" {% if status == 'credit_ing' %}selected{% endif %}>信审中</option> {# 选项 #}
+            <option value="issued" {% if status == 'issued' %}selected{% endif %}>已发卡</option> {# 选项 #}
+            <option value="returned" {% if status == 'returned' %}selected{% endif %}>退回补充</option> {# 选项 #}
+            <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>信审拒绝</option> {# 选项 #}
+            <option value="second_reject" {% if status == 'second_reject' %}selected{% endif %}>复审拒绝</option> {# 选项 #}
+        </select> {# 选择结束 #}
+    </div> {# 列结束 #}
+    <div class="col-md-2"> {# 按钮列 #}
+        <button class="btn btn-primary w-100" type="submit">筛选</button> {# 提交 #}
+    </div> {# 列结束 #}
+</form> {# 表单结束 #}
+<div class="table-responsive"> {# 响应式表格容器 #}
+<table class="table table-striped table-sm align-middle"> {# 表格样式 #}
+    <thead><tr><th>编号</th><th>{{ core_labels.applicant_name|default:"申请人姓名" }}</th><th>{{ core_labels.id_card|default:"身份证号" }}</th><th>{{ core_labels.phone|default:"手机号码" }}</th><th>{{ core_labels.card_product|default:"申请卡种" }}</th><th>申请金额（元）</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead> {# 表头 #}
+    <tbody> {# 表体 #}
+    {% for row in page_obj %} {# 遍历当前页记录 #}
+        <tr> {# 行开始 #}
+            <td>{{ row.id }}</td> {# 主键 #}
+            <td>{{ row.applicant_name }}</td> {# 姓名 #}
+            <td>{{ row.id_card }}</td> {# 身份证 #}
+            <td>{{ row.phone }}</td> {# 手机号 #}
+            <td>{{ row.card_product.product_name|default:"-" }}</td> {# 申请卡种 #}
+            <td>{{ row.amount }}</td> {# 申请金额 #}
+            <td>{{ row.get_status_display }}</td> {# 状态 #}
+            <td>{{ row.created_at|date:"Y-m-d H:i" }}</td> {# 提交时间 #}
+            <td> {# 操作列 #}
+                <a class="btn btn-link btn-sm" href="{% url 'apply:application_detail' row.id %}">详情</a> {# 详情链接 #}
+                {% if row.status == 'returned' %} {# 退回状态显示补充按钮 #}
+                    <a class="btn btn-warning btn-sm" href="{% url 'apply:return_edit' row.id %}">补充资料</a> {# 编辑链接 #}
+                {% endif %} {# 条件结束 #}
+            </td> {# 操作列结束 #}
+        </tr> {# 行结束 #}
+    {% empty %} {# 无数据分支 #}
+        <tr><td colspan="9" class="text-center text-muted">暂无数据</td></tr> {# 空状态 #}
+    {% endfor %} {# 循环结束 #}
+    </tbody> {# 表体结束 #}
+</table> {# 表格结束 #}
+</div> {# 容器结束 #}
+{% if page_obj.has_other_pages %} {# 是否需要分页控件 #}
+<nav> {# 导航 #}
+    <ul class="pagination"> {# 分页列表 #}
+        {% if page_obj.has_previous %} {# 是否有上一页 #}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ keyword }}&status={{ status }}">上一页</a></li> {# 上一页链接 #}
+        {% endif %} {# 判断结束 #}
+        <li class="page-item disabled"><span class="page-link">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span></li> {# 当前页信息 #}
+        {% if page_obj.has_next %} {# 是否有下一页 #}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ keyword }}&status={{ status }}">下一页</a></li> {# 下一页 #}
+        {% endif %} {# 判断结束 #}
+    </ul> {# 分页结束 #}
+</nav> {# 导航结束 #}
+{% endif %} {# 分页判断结束 #}
+{% endblock %} {# 内容块结束 #}

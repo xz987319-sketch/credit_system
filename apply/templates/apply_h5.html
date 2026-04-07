@@ -1,0 +1,50 @@
+{% load static %} {# 加载静态标签 #}
+<!DOCTYPE html> {# HTML5 #}
+<html lang="zh-CN"> {# 中文 #}
+<head> {# 头 #}
+    <meta charset="utf-8"> {# 编码 #}
+    <meta name="viewport" content="width=device-width, initial-scale=1"> {# 视口 #}
+    <title>移动端信贷申请</title> {# 标题 #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"> {# Bootstrap #}
+    <link href="{% static 'app.css' %}" rel="stylesheet"> {# 项目样式 #}
+    <link href="{% static 'admin_custom.css' %}" rel="stylesheet"> {# 紧凑表单间距样式 #}
+</head> {# 头结束 #}
+<body class="bg-light"> {# 背景 #}
+<div class="container py-3"> {# 容器 #}
+    <h1 class="h4 text-center mb-3">信贷申请（演示银行 0000）</h1> {# 标题 #}
+    {% if messages %} {# 消息 #}
+        {% for message in messages %} {# 循环 #}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">{{ message }}</div> {# 提示 #}
+        {% endfor %} {# 结束 #}
+    {% endif %} {# 消息判断 #}
+    {% include "includes/post_confirm_modal.html" %} {# 与 PC 端一致的提交确认弹窗 #}
+    <form method="post" novalidate> {# 表单 #}
+        {% csrf_token %} {# 令牌 #}
+        {% if form.non_field_errors %} {# 表单级错误如防重提示 #}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div> {# 展示非字段错误 #}
+        {% endif %} {# 判断结束 #}
+        {% for field in form %} {# 字段 #}
+            {% if field.name == 'amount' %} {# 申请金额：区间提示与实时反馈 #}
+                <div class="mb-3"> {# 容器 #}
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label> {# 标签 #}
+                    {{ field }} {# 文本金额框 #}
+                    <p class="form-text text-muted mb-1" id="amount-range-hint">请先选择卡种，选择后将显示可申请金额范围。</p> {# 区间说明 #}
+                    <div id="amount-live-feedback" class="small mt-1" aria-live="polite"></div> {# 实时校验反馈 #}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %} {# 服务端错误 #}
+                </div> {# 结束 #}
+            {% else %} {# 其它字段默认渲染 #}
+                <div class="mb-3"> {# 间距 #}
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label> {# 标签 #}
+                    {{ field }} {# 控件 #}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %} {# 错误 #}
+                </div> {# div #}
+            {% endif %} {# 分支 #}
+        {% endfor %} {# 结束 #}
+        <button class="btn btn-primary w-100" type="submit">提交申请</button> {# 提交 #}
+    </form> {# 表单 #}
+</div> {# 容器 #}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script> {# Bootstrap JS #}
+<script src="{% static 'js/apply_amount_input.js' %}"></script> {# 金额输入与联动（须先于 post_confirm 注册捕获） #}
+<script src="{% static 'js/post_confirm.js' %}"></script> {# POST 二次确认 #}
+</body> {# body #}
+</html> {# html #}

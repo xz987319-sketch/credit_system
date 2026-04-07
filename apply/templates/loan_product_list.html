@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}选择信用卡产品{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-list-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+    .page-header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding-bottom: 24px;
+        border-bottom: 2px solid #e9ecef;
+    }
+    .page-header h1 {
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 8px;
+    }
+    .page-header p {
+        color: #6c757d;
+        margin: 0;
+    }
+    .product-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        transition: all 0.3s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .product-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+    .product-info {
+        flex: 1;
+    }
+    .product-type-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #fff;
+        margin-bottom: 8px;
+    }
+    .product-type-badge.gold { background: linear-gradient(135deg, #d4a853, #b8860b); }
+    .product-type-badge.platinum { background: linear-gradient(135deg, #4a5568, #2d3748); }
+    .product-type-badge.classic { background: linear-gradient(135deg, #3182ce, #2c5282); }
+    .product-name {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+    .product-actions {
+        margin-left: 24px;
+    }
+    .btn-detail, .btn-apply {
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        margin-left: 8px;
+    }
+    .btn-detail {
+        background: white;
+        border: 1px solid #ced4da;
+        color: #495057;
+    }
+    .btn-detail:hover {
+        background: #f8f9fa;
+        color: #212529;
+    }
+    .btn-apply {
+        background: #0d6efd;
+        border: none;
+        color: white;
+    }
+    .btn-apply:hover {
+        background: #0b5ed7;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="product-list-container">
+    <div class="page-header">
+        <h1>{{ bank.bank_name|default:"信用卡" }} - 选择卡种</h1>
+        <p>请选择您想要申请的信用卡产品</p>
+    </div>
+
+    {% if is_superuser %}
+        <div class="alert alert-info mb-4">
+            <strong>管理员模式</strong>：您可以申请所有银行的卡产品。
+        </div>
+    {% elif user_bank %}
+        <div class="alert alert-info mb-4">
+            <strong>当前银行</strong>：{{ user_bank.bank_name }} ({{ user_bank.bank_code }})
+        </div>
+    {% endif %}
+
+    {% for product in products %}
+    <div class="product-card">
+        <div class="product-info">
+            <span class="product-type-badge
+                {% if '金卡' in product.product_type %}gold
+                {% elif '白金' in product.product_type %}platinum
+                {% else %}classic{% endif %}">
+                {{ product.product_type }}
+            </span>
+            <div class="product-name">{{ product.product_name }}</div>
+            {% if product.product_desc %}
+            <p class="text-muted small mt-2 mb-0">{{ product.product_desc|truncatechars:100 }}</p>
+            {% endif %}
+        </div>
+        <div class="product-actions">
+            <a href="{% url 'apply:loan_product_detail' product.pk %}" class="btn-detail">查看详情</a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="alert alert-warning text-center">
+        暂无可申请的卡产品，请联系管理员。
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

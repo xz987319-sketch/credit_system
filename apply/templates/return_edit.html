@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% load form_tags %}
+
+{% block title %}补充资料{% endblock %}
+
+{# 获取核心字段标签配置 #}
+{% get_core_field_labels as core_labels %}
+
+{% block content %}
+<h1 class="h4 mb-3">补充资料 #{{ application.id }}</h1>
+{% if application.return_reason %}
+<p class="text-muted">
+    <i class="bi bi-exclamation-triangle me-1 text-warning"></i>
+    {{ core_labels.return_reason|default:"退回原因" }}：{{ application.return_reason }}
+</p>
+{% endif %}
+
+{# ====== 核心字段编辑表单 ====== #}
+<form method="post" novalidate enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <i class="bi bi-person me-1"></i>申请人信息
+        </div>
+        <div class="card-body">
+            {# 核心字段：姓名、身份证、手机（只读展示） #}
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label class="form-label text-muted small">{{ core_labels.applicant_name|default:"申请人姓名" }}</label>
+                    <div class="form-control bg-light text-secondary">{{ application.applicant_name }}</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small">{{ core_labels.id_card|default:"身份证号" }}</label>
+                    <div class="form-control bg-light text-secondary">{{ application.id_card }}</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small">{{ core_labels.phone|default:"手机号码" }}</label>
+                    <div class="form-control bg-light text-secondary">{{ application.phone }}</div>
+                </div>
+            </div>
+
+            {# 卡种选择（只读展示） #}
+            <div class="mb-3">
+                <label class="form-label text-muted small">{{ core_labels.card_product|default:"申请卡种" }}</label>
+                <div class="form-control bg-light text-secondary">
+                    {{ application.card_product.product_name|default:"未选择" }}
+                </div>
+            </div>
+
+            {# 金额字段（只读展示） #}
+            <div class="mb-3">
+                <label class="form-label text-muted small">申请金额（元）</label>
+                <div class="form-control bg-light text-secondary">
+                    {{ application.amount|floatformat:0|default:"0" }} 元
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ====== 动态表单字段（可编辑模式，基本信息页字段自动只读） ====== #}
+    {% if form_pages %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <i class="bi bi-file-earmark-text me-1"></i>补充资料
+        </div>
+        <div class="card-body">
+            {% include "includes/_dynamic_fields.html" with mode="editable" form_pages=form_pages form_data=form_data errors=form.errors %}
+        </div>
+    </div>
+    {% endif %}
+
+    {# 补充说明 #}
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.supplementary_note.id_for_label }}">{{ core_labels.supplementary_note|default:"补充说明" }}</label>
+                {{ form.supplementary_note }}
+                {% if form.supplementary_note.errors %}
+                <div class="text-danger small">{{ form.supplementary_note.errors }}</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">
+        <i class="bi bi-check-lg me-1"></i>提交并重新进入初审
+    </button>
+</form>
+
+<a class="btn btn-secondary mt-3" href="{% url 'apply:my_applications' %}">
+    <i class="bi bi-arrow-left me-1"></i>返回列表
+</a>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// 图片上传预览与 base64 处理
+function handleImageSelect(input, previewContainerId, base64FieldId) {
+    var file = input.files[0];
+    var previewContainer = document.getElementById(previewContainerId);
+    var base64Field = document.getElementById(base64FieldId);
+
+    if (!file) return;
+
+    // 验证文件类型
+    if (!file.type.startsWith('image/')) {
+        alert('请选择图片文件');
+        input.value = '';
+        return;
+    }
+
+    // 验证文件大小（最大 5MB）
+    if (file.size > 5 * 1024 * 1024) {
+        alert('图片大小不能超过 5MB');
+        input.value = '';
+        return;
+    }
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var base64 = e.target.result;
+
+        // 更新预览
+        if (previewContainer) {
+            var existingImg = previewContainer.querySelector('img');
+            if (existingImg) {
+                existingImg.src = base64;
+            } else {
+                var img = document.createElement('img');
+                img.src = base64;
+                img.className = 'img-thumbnail';
+                img.style.maxWidth = '200px';
+                img.style.maxHeight = '150px';
+                previewContainer.innerHTML = '';
+                previewContainer.appendChild(img);
+            }
+            var hint = previewContainer.parentElement.querySelector('.small.text-muted');
+            if (hint) hint.textContent = '已选择新图片';
+        }
+
+        // 更新 base64 字段
+        if (base64Field) {
+            base64Field.value = base64;
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// 表单验证逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('form[method="post"]');
+    if (!form) return;
+
+    // 姓名校验（1-15个汉字，可含·）
+    function validateName(input) {
+        var value = input.value.trim();
+        if (value && !/^[\u4e00-\u9fff·]{1,15}$/.test(value)) {
+            showFieldError(input, '姓名须为1～15个汉字，可包含少数民族用间隔符"·"');
+            return false;
+        }
+        hideFieldError(input);
+        return true;
+    }
+
+    // 身份证号校验（18位）
+    function validateIdCard(input) {
+        var value = input.value.trim();
+        if (value && !/^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dX]$/i.test(value)) {
+            showFieldError(input, '身份证号码格式不正确，请核对18位号码');
+            return false;
+        }
+        hideFieldError(input);
+        return true;
+    }
+
+    // 手机号校验
+    function validatePhone(input) {
+        var value = input.value.trim();
+        if (value && !/^1[3-9]\d{9}$/.test(value)) {
+            showFieldError(input, '手机号码格式不正确');
+            return false;
+        }
+        hideFieldError(input);
+        return true;
+    }
+
+    // 金额校验（正整数）
+    function validateAmount(input) {
+        var value = input.value.trim();
+        if (value && !/^\d+$/.test(value)) {
+            showFieldError(input, '申请金额须为正整数');
+            return false;
+        }
+        hideFieldError(input);
+        return true;
+    }
+
+    // 显示字段错误
+    function showFieldError(input, message) {
+        input.classList.add('is-invalid');
+        var feedback = input.nextElementSibling;
+        if (feedback && (feedback.classList.contains('invalid-feedback') || feedback.classList.contains('text-danger'))) {
+            feedback.textContent = message;
+            feedback.style.display = 'block';
+        } else {
+            // 创建错误提示
+            var div = document.createElement('div');
+            div.className = 'text-danger small mt-1';
+            div.textContent = message;
+            input.parentNode.insertBefore(div, input.nextSibling);
+        }
+    }
+
+    // 隐藏字段错误
+    function hideFieldError(input) {
+        input.classList.remove('is-invalid');
+        var feedback = input.nextElementSibling;
+        if (feedback && (feedback.classList.contains('invalid-feedback') || feedback.classList.contains('text-danger'))) {
+            feedback.style.display = 'none';
+        }
+    }
+
+    // 为需要校验的字段绑定事件
+    var nameFields = form.querySelectorAll('input[name*="name"][type="text"], input.js-name-field');
+    nameFields.forEach(function(field) {
+        field.addEventListener('blur', function() { validateName(this); });
+        field.addEventListener('input', function() { hideFieldError(this); });
+    });
+
+    var idCardFields = form.querySelectorAll('input[maxlength="18"][type="text"]');
+    idCardFields.forEach(function(field) {
+        if (field.name.toLowerCase().includes('idcard') || field.name.toLowerCase().includes('id_card') || field.name.toLowerCase().includes('证件')) {
+            field.addEventListener('blur', function() { validateIdCard(this); });
+            field.addEventListener('input', function() { hideFieldError(this); });
+        }
+    });
+
+    var phoneFields = form.querySelectorAll('input[type="tel"], input[maxlength="11"][type="text"]');
+    phoneFields.forEach(function(field) {
+        if (field.name.toLowerCase().includes('phone') || field.name.toLowerCase().includes('手机')) {
+            field.addEventListener('blur', function() { validatePhone(this); });
+            field.addEventListener('input', function() { hideFieldError(this); });
+        }
+    });
+
+    var amountFields = form.querySelectorAll('input[type="text"][maxlength="12"]');
+    amountFields.forEach(function(field) {
+        if (field.name.toLowerCase().includes('amount') || field.name.toLowerCase().includes('金额')) {
+            field.addEventListener('blur', function() { validateAmount(this); });
+            field.addEventListener('input', function() { hideFieldError(this); });
+        }
+    });
+
+    // 表单提交前验证
+    form.addEventListener('submit', function(e) {
+        var isValid = true;
+
+        // 验证姓名
+        nameFields.forEach(function(field) {
+            if (!validateName(field)) isValid = false;
+        });
+
+        // 验证身份证
+        idCardFields.forEach(function(field) {
+            if (field.name.toLowerCase().includes('idcard') || field.name.toLowerCase().includes('id_card') || field.name.toLowerCase().includes('证件')) {
+                if (!validateIdCard(field)) isValid = false;
+            }
+        });
+
+        // 验证手机号
+        phoneFields.forEach(function(field) {
+            if (field.name.toLowerCase().includes('phone') || field.name.toLowerCase().includes('手机')) {
+                if (!validatePhone(field)) isValid = false;
+            }
+        });
+
+        // 验证金额
+        amountFields.forEach(function(field) {
+            if (field.name.toLowerCase().includes('amount') || field.name.toLowerCase().includes('金额')) {
+                if (!validateAmount(field)) isValid = false;
+            }
+        });
+
+        if (!isValid) {
+            e.preventDefault();
+            // 滚动到第一个错误
+            var firstError = form.querySelector('.is-invalid');
+            if (firstError) {
+                firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstError.focus();
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

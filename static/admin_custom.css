@@ -1,0 +1,227 @@
+/* ===== Django Admin (Unfold) 自定义补充样式 ===== */
+
+/* ---------- 1. 密码输入框边框 ---------- */
+/*
+  Unfold 使用 Tailwind，密码字段的 <input type="password"> 可能缺少明显边框。
+  通过精确选择器同时覆盖原生 Django Admin 与 Unfold 的输入框。
+*/
+
+/* 通用：所有 type=password 输入框 */
+input[type="password"] {
+    border: 1px solid #aaa !important;       /* 默认可见边框 */
+    border-radius: 4px;
+    padding: 6px 10px;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 悬停高亮 */
+input[type="password"]:hover {
+    border-color: #666 !important;
+}
+
+/* 聚焦高亮（蓝色光晕，与 Bootstrap / Unfold 风格一致） */
+input[type="password"]:focus {
+    border-color: #3b82f6 !important;        /* 蓝色边框 */
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+}
+
+/* Unfold 将输入框包裹在 .vTextField / [type=password] 中，追加更强选择器 */
+.form-row input[type="password"],
+fieldset input[type="password"],
+.module input[type="password"] {
+    border: 1px solid #aaa !important;
+}
+
+.form-row input[type="password"]:focus,
+fieldset input[type="password"]:focus,
+.module input[type="password"]:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+}
+
+
+/* ========== 2. 紧凑表单间距 ========== */
+/*
+  目标：减少表单区域（基本信息 / 详细信息等区块）的垂直间距，
+  达到紧凑清晰的显示效果。
+
+  修改说明：
+  ──────────────────────────────────────────────
+  区块容器（.card, .form-section, .block 等）
+  ──────────────────────────────────────────────
+  原来：margin-bottom: 16px 或 24px（Bootstrap 默认 mb-3 = 1rem ≈ 16px）
+  现在：margin-bottom: 8px
+
+  ──────────────────────────────────────────────
+  表单项之间的间距（.mb-3 → .mb-2）
+  ──────────────────────────────────────────────
+  原来：margin-bottom: 16px
+  现在：margin-bottom: 8px
+
+  ──────────────────────────────────────────────
+  区块标题与第一个字段之间的间距
+  ──────────────────────────────────────────────
+  原来：padding-top / margin-top 较大
+  现在：padding-top / margin-top: 4px ~ 8px
+*/
+
+/* 表单区块容器 - 减少外边距 */
+.form-section,
+.card,
+.block {
+    margin-bottom: 8px !important;
+}
+
+/* Bootstrap 卡片内边距微调 */
+.card-body {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}
+
+/* 区块内标题 - 减少与下方字段的间距 */
+.form-section h2,
+.form-section h3,
+.form-section h4,
+.card-header,
+.block-title,
+.section-title {
+    margin-bottom: 4px !important;
+    padding-bottom: 4px !important;
+}
+
+/* Bootstrap row 的 gap 缩小 */
+.row {
+    --bs-gutter-x: 1rem;      /* 保持原有的左右间距 */
+    --bs-gutter-y: 0.5rem;   /* 原来可能是 0，改小为 8px */
+}
+
+/* 表单项容器 - Bootstrap 默认 mb-3 (16px) → mb-2 (8px) */
+.mb-3,
+.form-group,
+.form-item,
+.field-row {
+    margin-bottom: 8px !important;
+}
+
+/* 特别处理：内联表单和列表中的表单项 */
+.row.g-3 > *,
+.row.g-2 > * {
+    margin-bottom: 4px !important;
+}
+
+/* 标签与输入框间距缩小 */
+.form-label {
+    margin-bottom: 4px !important;
+}
+
+/* 表单帮助文本和错误信息间距缩小 */
+.form-text,
+.invalid-feedback,
+.text-danger.small {
+    margin-top: 2px !important;
+    margin-bottom: 4px !important;
+}
+
+/* card-header 与 card-body 间距 */
+.card-header {
+    margin-bottom: 0 !important;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
+
+/* 移除区块之间的多余空行 */
+.form-section + .form-section,
+.card + .card,
+.block + .block {
+    margin-top: 0 !important;
+}
+
+/* 确保按钮区域有足够空间但不过大 */
+.btn,
+button[type="submit"] {
+    margin-top: 8px !important;
+}
+
+/* 容器内边距微调 */
+.container,
+.container-fluid {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+}
+
+
+/* ========== 3. Django Admin 列表页紧凑样式 ========== */
+/*
+  目标：类似第二张截图的效果
+  - 行高 40px 左右
+  - 单行文本输入框
+  - 只有 3 列：页面顺序、页面标题、页面说明
+*/
+
+/* 表格行高强制 40px */
+table tbody tr {
+    height: 40px !important;
+    line-height: 1.2 !important;
+}
+
+/* 表格单元格内边距极小 */
+table tbody td {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    vertical-align: middle !important;
+}
+
+/* 表头单元格 */
+table thead th {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+    font-size: 12px !important;
+}
+
+/* 输入框变成紧凑单行 */
+table input[type="text"],
+table input[type="number"] {
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 6px !important;
+    font-size: 12px !important;
+    border-radius: 3px !important;
+}
+
+/* textarea 强制单行 */
+table textarea {
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    padding: 2px 6px !important;
+    font-size: 12px !important;
+    resize: none !important;
+    overflow: hidden !important;
+}
+
+/* 下拉框压缩 */
+table select {
+    height: 28px !important;
+    padding: 0 20px 0 6px !important;
+    font-size: 12px !important;
+}
+
+/* 表格字体 */
+table {
+    font-size: 12px !important;
+}
+
+
+/* ========== 4. 隐藏排序优先级数字 ========== */
+/*
+  列表页列标题旁的 sortpriority 数字（1、2 等）是多列排序时的优先级标记，
+  用户不需要看到，隐藏即可。⊗ 取消图标保留，让用户知道可以取消该列排序。
+*/
+.sortpriority {
+    display: none !important;
+}

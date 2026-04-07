@@ -1,0 +1,83 @@
+{% load static %} {# 加载静态资源标签 #}
+<!DOCTYPE html> {# 独立登录页不继承 base，避免顶栏干扰全屏渐变 #}
+<html lang="zh-CN" class="login-html"> {# 根节点类名供样式限定 #}
+<head> {# 头部 #}
+    <meta charset="utf-8"> {# 字符集 #}
+    <meta name="viewport" content="width=device-width, initial-scale=1"> {# 视口 #}
+    <title>银行信贷进件模拟系统 — 登录</title> {# 标题 #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"> {# Bootstrap 仅用于 alert #}
+    <link href="{% static 'login.css' %}" rel="stylesheet"> {# 登录页专用样式 #}
+</head> {# head 结束 #}
+<body class="login-body"> {# 全屏渐变背景 #}
+{% if messages %} {# Django 消息提示 #}
+<div class="login-messages"> {# 固定顶部消息区 #}
+    {% for message in messages %} {# 遍历 #}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show shadow-sm" role="alert"> {# 样式 #}
+            {{ message }} {# 文本 #}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></button> {# 关闭 #}
+        </div> {# alert #}
+    {% endfor %} {# 结束 #}
+</div> {# messages #}
+{% endif %} {# 判断 #}
+
+<div class="login-wrap"> {# 垂直居中包装 #}
+    <div class="login-card"> {# 白底卡片 #}
+        <h1 class="login-title">银行信贷进件模拟系统 登录</h1> {# 标题与参考图一致 #}
+        <form method="post" class="no-post-confirm" novalidate> {# POST 登录，跳过全局二次确认 #}
+            {% csrf_token %} {# CSRF #}
+            {% for field in form %} {# 遍历字段 #}
+                {% if field.name == 'captcha' %} {# 验证码：左输入右可点击区域 #}
+                    <div class="login-field"> {# 字段块 #}
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label> {# 标签 #}
+                        <div class="captcha-row"> {# 横向排列 #}
+                            {{ field }} {# 左侧输入框 #}
+                            <div class="captcha-display" id="captcha-display" title="点击刷新验证码" role="button" tabindex="0">{{ captcha_code }}</div> {# 右侧验证码，点击刷新 #}
+                        </div> {# row #}
+                        <p class="captcha-hint">点击右侧验证码区域可更换，无需刷新整页</p> {# 操作提示 #}
+                        {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors }}</div>{% endif %} {# 错误 #}
+                    </div> {# field #}
+                {% else %} {# 其它字段 #}
+                    <div class="login-field"> {# 普通字段 #}
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label> {# 标签 #}
+                        {{ field }} {# 控件 #}
+                        {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors }}</div>{% endif %} {# 错误 #}
+                    </div> {# field #}
+                {% endif %} {# 分支 #}
+            {% endfor %} {# 结束 #}
+            <button class="btn-login-submit" type="submit">登录</button> {# 主按钮 #}
+        </form> {# form #}
+    </div> {# card #}
+    <p class="login-footnote">演示账号请参见 README 中种子数据说明</p> {# 页脚说明 #}
+</div> {# wrap #}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script> {# 关闭消息用 #}
+<script> {# 验证码点击刷新：请求接口更新 session 与展示 #}
+(function () {
+  var box = document.getElementById("captcha-display"); // 右侧验证码容器
+  var input = document.getElementById("id_captcha_input"); // 验证码输入框
+  var url = "{% url 'apply:refresh_captcha' %}"; // 刷新接口地址
+  if (!box) return; // 无元素则退出
+  function refreshCaptcha() {
+    box.style.opacity = "0.65"; // 请求中略变淡
+    fetch(url, { credentials: "same-origin", headers: { "Accept": "application/json" } }) // 同站携带 Cookie
+      .then(function (r) { return r.json(); }) // 解析 JSON
+      .then(function (data) {
+        if (data && data.code) {
+          box.textContent = data.code; // 更新展示字符
+          if (input) input.value = ""; // 清空已输入，避免与旧码混淆
+        }
+      })
+      .catch(function () { /* 静默失败，可在此 toast */ })
+      .finally(function () { box.style.opacity = "1"; }); // 恢复不透明
+  }
+  box.addEventListener("click", refreshCaptcha); // 点击刷新
+  box.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      refreshCaptcha();
+    }
+  }); // 键盘可访问性
+})();
+</script> {# 脚本结束 #}
+</body> {# body #}
+</html> {# html #}

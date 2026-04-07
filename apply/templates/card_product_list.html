@@ -1,0 +1,104 @@
+{% load static %}  {# 加载静态标签 #}
+<!DOCTYPE html>  {# HTML5 #}
+<html lang="zh-CN">  {# 中文 #}
+<head>  {# 头 #}
+    <meta charset="utf-8">  {# 编码 #}
+    <meta name="viewport" content="width=device-width, initial-scale=1">  {# 视口，移动端适配 #}
+    <title>选择信用卡产品</title>  {# 页面标题 #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">  {# Bootstrap 5 CSS #}
+    <link href="{% static 'app.css' %}" rel="stylesheet">  {# 项目自定义样式 #}
+    <style>
+        /* 卡片容器：白色背景、圆角、阴影，模拟 App 卡片风格 */
+        .product-card {
+            background: #fff;  /* 白色底 */
+            border-radius: 12px;  /* 圆角 12px */
+            padding: 20px;  /* 内边距 20px */
+            margin-bottom: 16px;  /* 卡片间距 16px */
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);  /* 轻微阴影 */
+            cursor: pointer;  /* 鼠标变为手型，提示可点击 */
+            transition: transform 0.2s, box-shadow 0.2s;  /* 过渡动画 */
+        }
+        /* 点击/悬停效果：轻微上移 + 阴影加深 */
+        .product-card:hover, .product-card:active {
+            transform: translateY(-2px);  /* 上移 2px */
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);  /* 阴影加深 */
+        }
+        /* 产品类型标签：金色/蓝色渐变背景 */
+        .product-type-badge {
+            display: inline-block;  /* 行内块 */
+            padding: 4px 12px;  /* 内边距 */
+            border-radius: 20px;  /* 胶囊形状 */
+            font-size: 12px;  /* 小字体 */
+            font-weight: 500;  /* 中等粗细 */
+            color: #fff;  /* 白色文字 */
+        }
+        .product-type-badge.gold { background: linear-gradient(135deg, #d4a853, #b8860b); }  /* 金卡：金色渐变 */
+        .product-type-badge.platinum { background: linear-gradient(135deg, #4a5568, #2d3748); }  /* 白金卡：深灰渐变 */
+        .product-type-badge.classic { background: linear-gradient(135deg, #3182ce, #2c5282); }  /* 普卡：蓝色渐变 */
+        /* 产品名称：大字体，加粗 */
+        .product-name {
+            font-size: 18px;  /* 18px 字体 */
+            font-weight: 600;  /* 加粗 */
+            color: #1a202c;  /* 深色文字 */
+            margin: 12px 0;  /* 上下间距 */
+        }
+
+        /* 申请按钮：蓝色背景，白色文字 */
+        .apply-btn {
+            display: block;  /* 块级元素占满宽 */
+            width: 100%;  /* 宽度 100% */
+            padding: 12px;  /* 内边距 */
+            margin-top: 16px;  /* 上边距 */
+            background: #3182ce;  /* 蓝色背景 */
+            color: #fff;  /* 白色文字 */
+            border: none;  /* 无边框 */
+            border-radius: 8px;  /* 圆角 */
+            font-size: 16px;  /* 字体大小 */
+            text-align: center;  /* 居中文字 */
+            text-decoration: none;  /* 去掉下划线 */
+            transition: background 0.2s;  /* 过渡效果 */
+        }
+        .apply-btn:hover { background: #2c5282; color: #fff; }  /* 悬停变深蓝 */
+    </style>
+</head>
+<body class="bg-light">  {# 浅灰色背景 #}
+
+<div class="container py-4">  {# 容器，上下 16px 内边距 #}
+
+    {# 页面标题 #}
+    <h1 class="h4 text-center mb-4">{{ bank.bank_name|default:"信用卡" }} - 选择卡种</h1>
+
+    {# 遍历卡产品列表，每个产品渲染一个卡片 #}
+    {% for product in products %}
+    <div class="product-card" onclick="location.href='{% url 'apply:card_product_detail' product.pk %}'">
+        {# 卡种类型标签 + 额度范围（额度去掉不显示）一行展示 #}
+        <div class="d-flex justify-content-between align-items-center">
+            <span class="product-type-badge
+                {% if '金卡' in product.product_type %}gold
+                {% elif '白金' in product.product_type %}platinum
+                {% else %}classic{% endif %}">
+                {{ product.product_type }}  {# 显示卡种类型（金卡/白金卡/普卡）#}
+            </span>
+        </div>
+
+        {# 产品名称 #}
+        <div class="product-name">{{ product.product_name }}</div>
+
+        {# 产品简要描述（如果有） #}
+        {% if product.product_desc %}
+        <p class="text-muted small mb-0">{{ product.product_desc|truncatechars:80 }}</p>
+        {% endif %}
+
+    </div>
+    {% empty %}
+    {# 无可用卡产品时显示提示 #}
+    <div class="text-center text-muted py-5">
+        <p>暂无可申请的卡产品</p>
+    </div>
+    {% endfor %}
+
+</div>  {# container 结束 #}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>  {# Bootstrap JS #}
+</body>
+</html>
