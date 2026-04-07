@@ -69,7 +69,7 @@
             <i class="bi bi-file-earmark-text me-1"></i>补充资料
         </div>
         <div class="card-body">
-            {% include "includes/_dynamic_fields.html" with mode="editable" form_pages=form_pages form_data=form_data errors=form.errors %}
+            {% include "includes/_dynamic_fields.html" with mode="editable" form_pages=form_pages form_data=form_data errors=errors|default:form.errors %}
         </div>
     </div>
     {% endif %}

@@ -352,27 +352,98 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
         messages.warning(request, "当前状态不可补充资料")  # 提示状态不符
         return redirect("apply:my_applications")  # 返回列表
     if request.method == "POST":  # 处理保存提交
+        # ========== 动态表单字段后端校验 ==========
+        from apply.models.form_config import FormPage, FormField
+        from apply.views.multi_step_form import _validate_step_data
+        
+        # 获取所有动态字段配置（用于校验）
+        form_pages_config = FormPage.objects.filter(is_active=True).prefetch_related(
+            Prefetch('fields', queryset=FormField.objects.filter(is_active=True).order_by('sort_order'))
+        ).order_by('order')
+        
+        all_errors = {}
+        for page in form_pages_config:
+            # 收集当前页的所有字段用于校验
+            page_fields = list(page.fields.all())
+            if page_fields:
+                is_valid, step_errors = _validate_step_data(page_fields, request.POST, product=application.card_product)
+                if not is_valid:
+                    all_errors.update(step_errors)
+        
+        # 如果有校验错误，返回表单并显示错误
+        if all_errors:
+            form = ReturnEditForm(instance=application)
+            # 保留用户输入的动态字段值
+            form_data = dict(application.form_data or {})
+            first_page = FormPage.objects.filter(is_active=True).order_by('order').first()
+            for page in form_pages_config:
+                for field in page.fields.all():
+                    if field.field_key in {'applicant_name', 'id_card', 'phone', 'amount', 'card_product', 'supplementary_note', 'return_reason', 'applicant_name_pinyin'}:
+                        continue
+                    is_basic_readonly = (page.pk == first_page.pk) if first_page else False
+                    field_value = request.POST.get(field.field_key)
+                    if is_basic_readonly and not field_value:
+                        field_value = form_data.get(field.field_key)
+                    if field.field_type == 'checkbox':
+                        checkbox_values = request.POST.getlist(field.field_key)
+                        if checkbox_values:
+                            field_value = ','.join(checkbox_values)
+                        elif is_basic_readonly:
+                            field_value = form_data.get(field.field_key)
+                    base64_value = request.POST.get(f'{field.field_key}_base64')
+                    if base64_value is not None and base64_value:
+                        field_value = base64_value
+                    if field_value:
+                        form_data[field.field_key] = field_value
+            return render(request, "return_edit.html", {
+                "form": form,
+                "application": application,
+                "form_pages": form_pages_config,
+                "form_data": form_data,
+                "errors": all_errors,
+            })
+        # ========== 动态表单字段后端校验结束 ==========
+        
         form = ReturnEditForm(request.POST, instance=application)  # 绑定实例
         if form.is_valid():  # 校验表单
             obj = form.save(commit=False)  # 生成待保存对象
 
             # 保存动态字段到 form_data
-            from apply.models.form_config import FormPage
             dynamic_data = dict(application.form_data or {})  # 保留原有数据
+            
+            # 获取第一页（基本信息页）用于判断只读字段
+            first_page = FormPage.objects.filter(is_active=True).order_by('order').first()
+            
             for page in FormPage.objects.filter(is_active=True).order_by('order'):
                 for field in page.fields.filter(is_active=True).order_by('sort_order'):
                     # 跳过核心字段和只读字段
                     if field.field_key in {'applicant_name', 'id_card', 'phone', 'amount', 'card_product', 'supplementary_note', 'return_reason', 'applicant_name_pinyin'}:
                         continue
+                    
+                    # 判断是否为第一页（基本信息页）的只读字段
+                    is_basic_readonly = (page.pk == first_page.pk) if first_page else False
+                    
                     # 从 POST 获取动态字段值
                     field_value = request.POST.get(field.field_key)
+                    
+                    # 如果是只读字段（下拉框、单选框、复选框disabled后值不提交），从原有数据恢复
+                    if is_basic_readonly and not field_value:
+                        field_value = dynamic_data.get(field.field_key)
+                    
                     # 处理复选框（多个同名字段）
                     if field.field_type == 'checkbox':
-                        field_value = ','.join(request.POST.getlist(field.field_key))
+                        checkbox_values = request.POST.getlist(field.field_key)
+                        if checkbox_values:
+                            field_value = ','.join(checkbox_values)
+                        elif is_basic_readonly:
+                            # 只读复选框也从原有数据恢复
+                            field_value = dynamic_data.get(field.field_key)
+                    
                     # 处理图片 base64
                     base64_value = request.POST.get(f'{field.field_key}_base64')
                     if base64_value is not None:
                         field_value = base64_value if base64_value else None
+                    
                     # 保存非空值
                     if field_value:
                         dynamic_data[field.field_key] = field_value
@@ -390,13 +461,23 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
             # 表单验证失败，保留用户输入的动态字段值
             form_data = dict(application.form_data or {})
             from apply.models.form_config import FormPage
+            first_page = FormPage.objects.filter(is_active=True).order_by('order').first()
             for page in FormPage.objects.filter(is_active=True).order_by('order'):
                 for field in page.fields.filter(is_active=True).order_by('sort_order'):
                     if field.field_key in {'applicant_name', 'id_card', 'phone', 'amount', 'card_product', 'supplementary_note', 'return_reason', 'applicant_name_pinyin'}:
                         continue
+                    # 判断是否为第一页的只读字段
+                    is_basic_readonly = (page.pk == first_page.pk) if first_page else False
                     field_value = request.POST.get(field.field_key)
+                    # 只读字段从原有数据恢复
+                    if is_basic_readonly and not field_value:
+                        field_value = form_data.get(field.field_key)
                     if field.field_type == 'checkbox':
-                        field_value = ','.join(request.POST.getlist(field.field_key))
+                        checkbox_values = request.POST.getlist(field.field_key)
+                        if checkbox_values:
+                            field_value = ','.join(checkbox_values)
+                        elif is_basic_readonly:
+                            field_value = form_data.get(field.field_key)
                     base64_value = request.POST.get(f'{field.field_key}_base64')
                     if base64_value is not None and base64_value:
                         field_value = base64_value
