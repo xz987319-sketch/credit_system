@@ -489,7 +489,6 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
 
     # 获取动态表单字段配置（用于公共模板）
     from apply.models.form_config import FormPage, FormField
-    from django.db.models import Prefetch
 
     # 获取所有启用的表单页面（含字段配置）
     form_pages = FormPage.objects.filter(is_active=True).prefetch_related(
