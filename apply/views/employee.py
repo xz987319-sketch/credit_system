@@ -4,7 +4,7 @@ from decimal import Decimal  # 导入高精度小数类型用于额度比较
 from django.contrib import messages  # 导入消息框架
 from django.contrib.auth.decorators import login_required  # 导入登录要求装饰器
 from django.core.paginator import Paginator  # 导入分页器类
-from django.db.models import Q  # 导入 Q 对象组合查询条件
+from django.db.models import Prefetch, Q  # 导入 Q 对象组合查询条件
 from django.shortcuts import get_object_or_404, redirect, render  # 导入快捷函数
 from django.views.decorators.http import require_http_methods  # 导入 HTTP 方法限制
 
