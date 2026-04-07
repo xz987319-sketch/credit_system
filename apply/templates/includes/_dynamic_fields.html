@@ -108,6 +108,9 @@
                                               placeholder="{{ field.placeholder }}"
                                               {% if is_readonly_field %}readonly{% endif %}
                                               {% if field.is_required and not is_readonly_field %}required{% endif %}>{{ value|default:'' }}</textarea>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 数字输入 #}
                                 {% elif field.field_type == 'number' %}
@@ -118,6 +121,9 @@
                                            placeholder="{{ field.placeholder }}"
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 日期输入 #}
                                 {% elif field.field_type == 'date' %}
@@ -129,6 +135,9 @@
                                            maxlength="8"
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 手机号 #}
                                 {% elif field.field_type == 'phone' or field.validation_rule == 'phone' %}
@@ -140,6 +149,9 @@
                                            maxlength="{{ field.max_length|default:'11' }}"
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 身份证号 #}
                                 {% elif field.field_type == 'id_card' or field.validation_rule == 'id_card' %}
@@ -151,6 +163,9 @@
                                            maxlength="{{ field.max_length|default:'18' }}"
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 姓名 #}
                                 {% elif field.field_type == 'name' or field.validation_rule == 'name' %}
@@ -162,6 +177,9 @@
                                            maxlength="{{ field.max_length|default:'30' }}"
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 姓名拼音 #}
                                 {% elif field.field_type == 'name_pinyin' %}
@@ -182,6 +200,9 @@
                                            maxlength="{{ field.max_length|default:'12' }}"
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
 
                                 {# 下拉框 #}
@@ -201,6 +222,9 @@
                                         </option>
                                         {% endfor %}
                                     </select>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 单选框 #}
                                 {% elif field.field_type == 'radio' %}
@@ -224,6 +248,9 @@
                                         </div>
                                         {% endfor %}
                                     </div>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 复选框 #}
                                 {% elif field.field_type == 'checkbox' %}
@@ -250,6 +277,9 @@
                                         </div>
                                         {% endfor %}
                                     </div>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 文件上传 #}
                                 {% elif field.field_type == 'file' %}
@@ -262,6 +292,9 @@
                                            name="{{ field.field_key }}"
                                            {% if is_readonly_field %}disabled{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {# 图片上传 #}
                                 {% elif field.field_type == 'image' %}
@@ -284,6 +317,9 @@
                                            id="{{ field.field_key }}_file"
                                            {% if is_readonly_field %}disabled{% endif %}
                                            {% if field.is_required and not value and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
 
                                 {% endif %}
 
