@@ -357,14 +357,12 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
         from apply.views.multi_step_form import _validate_step_data
         
         # 获取所有动态字段配置（用于校验）
-        form_pages_config = FormPage.objects.filter(is_active=True).prefetch_related(
-            Prefetch('fields', queryset=FormField.objects.filter(is_active=True).order_by('sort_order'))
-        ).order_by('order')
+        form_pages_config = FormPage.objects.filter(is_active=True).prefetch_related('fields').order_by('order')
         
         all_errors = {}
         for page in form_pages_config:
             # 收集当前页的所有字段用于校验
-            page_fields = list(page.fields.all())
+            page_fields = list(page.fields.filter(is_active=True).order_by('sort_order'))
             if page_fields:
                 is_valid, step_errors = _validate_step_data(page_fields, request.POST, product=application.card_product)
                 if not is_valid:
@@ -377,7 +375,7 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
             form_data = dict(application.form_data or {})
             first_page = FormPage.objects.filter(is_active=True).order_by('order').first()
             for page in form_pages_config:
-                for field in page.fields.all():
+                for field in page.fields.filter(is_active=True).order_by('sort_order'):
                     if field.field_key in {'applicant_name', 'id_card', 'phone', 'amount', 'card_product', 'supplementary_note', 'return_reason', 'applicant_name_pinyin'}:
                         continue
                     is_basic_readonly = (page.pk == first_page.pk) if first_page else False
