@@ -14,6 +14,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 import uuid
+import random
+import time
 
 from apply.models import FormPage, FormField, CardProduct, Application
 from apply.utils.apply_duplicate import id_card_holds_card_product
@@ -164,6 +166,83 @@ def pinyin_convert_api(request):
         pinyin = pinyin.replace('  ', ' ')
 
     return JsonResponse({'pinyin': pinyin, 'success': True})
+
+
+@require_http_methods(["POST"])
+def send_sms_code_api(request):
+    """
+    短信验证码发送API - H5申请页使用
+    POST参数: phone - 手机号
+    返回: {"success": true/false, "message": "...", "code": "..."}
+    """
+    import json
+    try:
+        data = json.loads(request.body)
+        phone = data.get('phone', '').strip()
+    except:
+        phone = request.POST.get('phone', '').strip()
+
+    if not phone:
+        return JsonResponse({'success': False, 'message': '请输入手机号'})
+
+    # 简单手机号格式校验
+    if not phone.startswith('1') or len(phone) != 11:
+        return JsonResponse({'success': False, 'message': '手机号格式不正确'})
+
+    # 生成6位验证码
+    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
+    # 存入session，key包含时间戳用于60秒限制
+    request.session['sms_code'] = code
+    request.session['sms_code_phone'] = phone
+    request.session['sms_code_time'] = int(time.time())
+
+    # 控制台打印验证码（模拟发送）
+    print(f"[SMS模拟发送] 手机号: {phone}, 验证码: {code}")
+
+    return JsonResponse({
+        'success': True,
+        'message': f'验证码已发送（模拟：{code}）',
+        'code': code  # 返回code便于前端调试打印
+    })
+
+
+@require_http_methods(["POST"])
+def verify_sms_code_api(request):
+    """
+    短信验证码校验API - H5申请表单提交时校验
+    POST参数: phone, code
+    返回: {"success": true/false, "message": "..."}
+    """
+    phone = request.POST.get('phone', '').strip()
+    code = request.POST.get('code', '').strip()
+
+    if not phone or not code:
+        return JsonResponse({'success': False, 'message': '请输入手机号和验证码'})
+
+    # 获取session中的验证码
+    session_code = request.session.get('sms_code', '')
+    session_phone = request.session.get('sms_code_phone', '')
+    session_time = request.session.get('sms_code_time', 0)
+
+    # 校验手机号一致性
+    if session_phone != phone:
+        return JsonResponse({'success': False, 'message': '手机号不一致，请重新获取验证码'})
+
+    # 校验验证码
+    if session_code != code:
+        return JsonResponse({'success': False, 'message': '验证码错误'})
+
+    # 校验是否过期（5分钟有效期）
+    if int(time.time()) - session_time > 300:
+        return JsonResponse({'success': False, 'message': '验证码已过期，请重新获取'})
+
+    # 验证成功后清除验证码（防止重复使用）
+    request.session.pop('sms_code', None)
+    request.session.pop('sms_code_phone', None)
+    request.session.pop('sms_code_time', None)
+
+    return JsonResponse({'success': True, 'message': '验证通过'})
 
 
 # ============================================================================
