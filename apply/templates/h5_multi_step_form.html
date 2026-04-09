@@ -277,7 +277,7 @@
                                    inputmode="numeric"
                                    {% if not field.is_readonly %}oninput="this.value=this.value.replace(/[^0-9]/g,'')"{% endif %}
                                    data-field-type="date"
-                                  {% if 'birth' in field.field_key|lower %}data-is-birthdate="true"{% endif %}
+                                  {% if 'birth' in field.field_key|lower %}data-is-birthdate="true" readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                   {% if 'expiry' in field.field_key|lower or 'validity' in field.field_key|lower or field.field_key == 'AP_CED_DATE' %}data-is-idcard-expiry="true"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
@@ -600,14 +600,11 @@
             var genderCode = parseInt(value.charAt(16));
             var gender = genderCode % 2 === 1 ? '男' : '女';
 
-            // 通过 data 属性查找出生日期字段并填充
+            // 通过 data 属性查找出生日期字段并填充（强制更新，不判断autoFilled）
             var birthDateField = document.querySelector('input[data-is-birthdate="true"]');
             if (birthDateField) {
-                if (!birthDateField.value || birthDateField.dataset.autoFilled === 'true') {
-                    birthDateField.value = birthDate;
-                    birthDateField.dataset.autoFilled = 'true';
-                    clearInvalid(birthDateField);
-                }
+                birthDateField.value = birthDate;
+                clearInvalid(birthDateField);
             }
 
             // 通过 data 属性查找性别字段并填充（如果是下拉框）
