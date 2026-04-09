@@ -2,12 +2,13 @@
 from django.contrib import messages  # 导入消息框架
 from django.contrib.auth.decorators import login_required  # 导入登录装饰器
 from django.core.paginator import Paginator  # 导入分页器
+from django.db.models import Q  # 导入 Q 对象组合查询条件
 from django.shortcuts import get_object_or_404, redirect, render  # 导入快捷函数
 from django.utils import timezone  # 导入时区工具
 from django.views.decorators.http import require_http_methods, require_POST  # 导入 HTTP 限制
 
 from apply.forms import ReasonForm  # 导入原因表单
-from apply.models import Application  # 导入申请模型
+from apply.models import Application, CardProduct  # 导入申请模型和卡产品模型
 from apply.models.form_config import FormPage  # 导入表单配置
 
 
@@ -22,14 +23,38 @@ def _deny_if_not_superuser(request):  # 内部超级用户校验
 @login_required  # 列表需登录
 @require_http_methods(["GET"])  # 仅展示
 def credit_pending_list_view(request):  # 信审待办列表
-    """展示所有银行处于信审中的申请。"""  # 视图文档字符串
+    """展示所有银行处于信审中的申请，支持姓名/身份证/手机号搜索和卡种筛选。"""  # 视图文档字符串
     maybe = _deny_if_not_superuser(request)  # 校验超级用户
     if maybe:  # 若失败
         return maybe  # 返回
+
     qs = Application.objects.select_related("bank", "card_product").filter(status=Application.ST_CREDIT_ING)  # 查询信审中
-    paginator = Paginator(qs.order_by("created_at"), 10)  # 分页
+
+    # 搜索：姓名、身份证或手机号
+    keyword = (request.GET.get("q") or "").strip()
+    if keyword:
+        qs = qs.filter(
+            Q(applicant_name__icontains=keyword) |
+            Q(id_card__icontains=keyword) |
+            Q(phone__icontains=keyword)
+        )
+
+    # 卡种筛选
+    card_product_id = (request.GET.get("card_product") or "").strip()
+    if card_product_id:
+        qs = qs.filter(card_product_id=card_product_id)
+
+    # 获取所有启用的卡种列表供下拉选择
+    card_products = CardProduct.objects.filter(is_active=True).order_by("bank__bank_name", "product_name")
+
+    paginator = Paginator(qs.order_by("-created_at"), 10)  # 按创建时间倒序分页（最新在前）
     page_obj = paginator.get_page(request.GET.get("page"))  # 当前页
-    return render(request, "credit_pending_list.html", {"page_obj": page_obj})  # 渲染
+    return render(request, "credit_pending_list.html", {
+        "page_obj": page_obj,
+        "keyword": keyword,
+        "card_products": card_products,
+        "card_product_id": card_product_id,
+    })  # 渲染
 
 
 @login_required  # 详情需登录

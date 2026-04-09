@@ -7,17 +7,36 @@
 
 {% block content %} {# 内容 #}
 <h1 class="h4 mb-3">待信审列表（全行）</h1> {# 说明全行数据 #}
+<form class="row g-2 mb-3" method="get"> {# GET 搜索表单 #}
+    <div class="col-md-4"> {# 关键字列 #}
+        <input class="form-control" name="q" value="{{ keyword }}" placeholder="姓名、身份证或手机号"> {# 搜索框 #}
+    </div> {# 列结束 #}
+    <div class="col-md-3"> {# 卡种下拉 #}
+        <select class="form-select" name="card_product"> {# 卡种选择 #}
+            <option value="">全部卡种</option> {# 默认项 #}
+            {% for product in card_products %}
+            <option value="{{ product.id }}" {% if card_product_id == product.id|stringformat:"i" %}selected{% endif %}>{{ product.bank.bank_name }} - {{ product.product_name }}</option> {# 选项 #}
+            {% endfor %}
+        </select> {# 选择结束 #}
+    </div> {# 列结束 #}
+    <div class="col-md-2"> {# 按钮列 #}
+        <button class="btn btn-primary w-100" type="submit">筛选</button> {# 提交 #}
+    </div> {# 列结束 #}
+</form> {# 表单结束 #}
 <div class="table-responsive"> {# 容器 #}
 <table class="table table-striped table-sm"> {# 表格 #}
-    <thead><tr><th>编号</th><th>银行</th><th>{{ core_labels.applicant_name|default:"申请人姓名" }}</th><th>申请金额（元）</th><th>{{ core_labels.card_product|default:"申请卡种" }}</th><th>操作</th></tr></thead> {# 表头 #}
+    <thead><tr><th>编号</th><th>银行</th><th>{{ core_labels.applicant_name|default:"申请人姓名" }}</th><th>证件号码</th><th>手机号</th><th>申请金额（元）</th><th>{{ core_labels.card_product|default:"申请卡种" }}</th><th>复审时间</th><th>操作</th></tr></thead> {# 表头 #}
     <tbody> {# 表体 #}
     {% for row in page_obj %} {# 循环 #}
         <tr> {# 行 #}
             <td>{{ row.id }}</td> {# id #}
             <td>{{ row.bank.bank_name }}</td> {# 银行 #}
             <td>{{ row.applicant_name }}</td> {# 姓名 #}
+            <td>{{ row.id_card }}</td> {# 证件号码 #}
+            <td>{{ row.phone }}</td> {# 手机号 #}
             <td>{{ row.amount }}</td> {# 额度 #}
             <td>{{ row.card_product.product_name }}</td> {# 产品 #}
+            <td>{{ row.init_audit_time }}</td> {# 复审时间 #}
             <td class="d-flex flex-wrap gap-1"> {# 操作 #}
                 <a class="btn btn-outline-primary btn-sm" href="{% url 'apply:credit_pending_detail' row.id %}">
                     <i class="bi bi-eye"></i> 详情
@@ -30,16 +49,16 @@
             </td> {# 操作 #}
         </tr> {# 行 #}
     {% empty %} {# 空 #}
-        <tr><td colspan="6" class="text-center text-muted">暂无信审任务</td></tr> {# 提示 #}
+        <tr><td colspan="9" class="text-center text-muted">暂无信审任务</td></tr> {# 提示 #}
     {% endfor %} {# 结束 #}
     </tbody> {# 表体 #}
 </table> {# 表格 #}
 </div> {# 容器 #}
 {% if page_obj.has_other_pages %} {# 分页 #}
 <nav><ul class="pagination"> {# 分页条 #}
-    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">上一页</a></li>{% endif %} {# 上 #}
-    <li class="page-item disabled"><span class="page-link">{{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li> {# 页码 #}
-    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">下一页</a></li>{% endif %} {# 下 #}
+    {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ keyword }}&card_product={{ card_product_id }}">上一页</a></li>{% endif %}
+    <li class="page-item disabled"><span class="page-link">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span></li> {# 页码 #}
+    {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ keyword }}&card_product={{ card_product_id }}">下一页</a></li>{% endif %}
 </ul></nav> {# nav #}
 {% endif %} {# 分页 #}
 {% endblock %} {# 块 #}

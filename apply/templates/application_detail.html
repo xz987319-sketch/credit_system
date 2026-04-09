@@ -81,8 +81,23 @@
 {% endif %}
 
 {# ====== 动态表单字段（公共模板 - 只读模式） ====== #}
-{% if form_pages and form_data %}
-{% include "includes/_dynamic_fields.html" with mode="readonly" form_pages=form_pages form_data=form_data %}
+{% if form_pages %}
+    {# 信审拒绝状态时，即使 form_data 为空也显示录入信息区域 #}
+    {% if form_data %}
+        {% include "includes/_dynamic_fields.html" with mode="readonly" form_pages=form_pages form_data=form_data %}
+    {% else %}
+        {# 无录入数据时的提示（信审拒绝等状态仍需展示区域） #}
+        {% if application.status == 'rejected' %}
+        <div class="card mb-3 border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <i class="bi bi-list-ul me-1"></i>录入信息
+            </div>
+            <div class="card-body text-muted">
+                <p class="mb-0 text-center">暂无录入信息</p>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
 {% endif %}
 
 {# ====== 审核记录 ====== #}

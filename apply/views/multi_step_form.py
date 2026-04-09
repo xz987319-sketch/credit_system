@@ -199,6 +199,12 @@ def _clear_session_form_data(request):
         del request.session['multi_step_form_data']
     if 'multi_step_product_id' in request.session:
         del request.session['multi_step_product_id']
+    if 'max_step_reached' in request.session:
+        del request.session['max_step_reached']
+    if 'form_token' in request.session:
+        del request.session['form_token']
+    if 'form_token_used' in request.session:
+        del request.session['form_token_used']
 
 
 def _validate_step_data(page_fields, post_data, product=None):
@@ -558,6 +564,11 @@ def multi_step_form_view(request, product_id):
         logger.warning(f"[DEBUG] PC Step {step} - after update session_data keys: {list(session_data.keys())}")
         _save_session_form_data(request, session_data)
 
+        # 更新最高到达步骤（用于判断用户是否曾离开过第0页）
+        current_max = request.session.get('max_step_reached', 0)
+        if step > current_max:
+            request.session['max_step_reached'] = step
+
         # 如果是最后一步，保存Application
         if is_last:
             # 标记 Token 为已用，防止刷新重提
@@ -575,12 +586,13 @@ def multi_step_form_view(request, product_id):
     # GET请求 - 显示指定步骤的表单
     step = int(request.GET.get('step', 0))
 
-    # 只有当没有session数据时才认为是新的申请流程
-    # （避免从第2页返回第1页时清除已填写的数据）
+    # 判断是否为新的申请流程
+    # 如果 max_step_reached > 0，说明用户曾经离开过第0页（如进入过第1步等），应保留数据
+    # 只有首次进入或 session 中无数据时才清空
     if step == 0:
-        existing_data = _get_session_form_data(request)
-        if not existing_data:
-            # 新的申请流程，清除旧数据，并生成新的表单Token
+        max_step_reached = request.session.get('max_step_reached', 0)
+        if max_step_reached == 0:
+            # 首次进入，清除旧数据，并生成新的表单Token
             _clear_session_form_data(request)
             request.session['form_token'] = str(uuid.uuid4())
             request.session.pop('form_token_used', None)
@@ -795,6 +807,11 @@ def h5_multi_step_form_view(request, product_id):
         logger.warning(f"[DEBUG] H5 Step {step} - after update session_data keys: {list(session_data.keys())}")
         _save_session_form_data(request, session_data)
 
+        # 更新最高到达步骤（用于判断用户是否曾离开过第0页）
+        current_max = request.session.get('max_step_reached', 0)
+        if step > current_max:
+            request.session['max_step_reached'] = step
+
         if is_last:
             # 标记 Token 为已用，防止刷新重提
             request.session['form_token_used'] = True
@@ -810,10 +827,11 @@ def h5_multi_step_form_view(request, product_id):
     # GET请求
     step = int(request.GET.get('step', 0))
 
-    # 只有当没有session数据时才认为是新的申请流程
+    # 判断是否为新的申请流程
+    # 如果 max_step_reached > 0，说明用户曾经离开过第0页，应保留数据
     if step == 0:
-        existing_data = _get_session_form_data(request)
-        if not existing_data:
+        max_step_reached = request.session.get('max_step_reached', 0)
+        if max_step_reached == 0:
             _clear_session_form_data(request)
             request.session['form_token'] = str(uuid.uuid4())
             request.session.pop('form_token_used', None)
