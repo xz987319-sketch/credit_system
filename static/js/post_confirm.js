@@ -27,7 +27,7 @@
   });
   document.addEventListener(
     "submit",
-    function (e) {
+    async function (e) {
       const form = e.target; // 事件目标应为表单元素
       if (!form || form.tagName !== "FORM" || form.method.toLowerCase() !== "post") {
         return; // 非 POST 表单不处理
@@ -44,12 +44,17 @@
         return; // 没有 post-confirm 类，跳过
       }
       // 【前置必填校验】：调用表单的 validateFormOnSubmit 进行完整校验
-      // 如果校验函数存在且返回 false，说明校验失败，阻止弹窗
+      // validateFormOnSubmit 是 async 函数，需要 await 获取结果
       if (typeof validateFormOnSubmit === "function") {
-        if (!validateFormOnSubmit(form)) {
-          e.preventDefault(); // 阻止提交
-          return;
+        e.preventDefault(); // 先阻止，校验通过后再手动提交
+        var valid = await validateFormOnSubmit(form);
+        if (!valid) {
+          return; // 校验失败，已在 validateFormOnSubmit 中处理错误提示
         }
+        // 校验通过，保存表单引用并显示确认弹窗
+        pendingForm = form;
+        modal.show();
+        return;
       }
       e.preventDefault(); // 阻止首次直接提交
       e.stopPropagation(); // 避免冒泡触发其它逻辑

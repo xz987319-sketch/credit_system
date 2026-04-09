@@ -300,11 +300,12 @@
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
 
                     {% elif field.field_type == 'select' %}
-                        <select class="form-select {% if field.field_key in errors %}is-invalid{% endif %}"
+                        <select class="form-select {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
                                 id="{{ field.field_key }}"
                                 name="{{ field.field_key }}"
                                 {% if 'sex' in field.field_key|lower %}data-is-gender="true"{% endif %}
-                                {% if field.is_required %}required{% endif %}>
+                                {% if field.is_readonly %}disabled{% endif %}
+                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
                             <option value="">请选择</option>
                             {% for option in field.options|parse_options %}
                                 <option value="{{ option.value }}" {% if page_data|get_item:field.field_key == option.value %}selected{% endif %}>
@@ -322,8 +323,9 @@
                                            id="{{ field.field_key }}_{{ forloop.counter }}"
                                            value="{{ option.value }}"
                                            {% if page_data|get_item:field.field_key == option.value %}checked{% endif %}
-                                           {% if field.is_required %}required{% endif %}>
-                                    <label class="form-check-label" for="{{ field.field_key }}_{{ forloop.counter }}">
+                                           {% if field.is_readonly %}disabled{% endif %}
+                                           {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                                    <label class="form-check-label{% if field.is_readonly %} text-secondary{% endif %}" for="{{ field.field_key }}_{{ forloop.counter }}">
                                         {{ option.label }}
                                     </label>
                                 </div>
@@ -337,8 +339,10 @@
                                     <input class="form-check-input" type="checkbox"
                                            name="{{ field.field_key }}"
                                            id="{{ field.field_key }}_{{ forloop.counter }}"
-                                           value="{{ option.value }}">
-                                    <label class="form-check-label" for="{{ field.field_key }}_{{ forloop.counter }}">
+                                           value="{{ option.value }}"
+                                           {% if field.is_readonly %}disabled{% endif %}
+                                           {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                                    <label class="form-check-label{% if field.is_readonly %} text-secondary{% endif %}" for="{{ field.field_key }}_{{ forloop.counter }}">
                                         {{ option.label }}
                                     </label>
                                 </div>
@@ -359,12 +363,13 @@
                         <input type="hidden" name="{{ field.field_key }}_base64" id="{{ field.field_key }}_base64" value="{{ page_data|get_item:field.field_key }}">
                         <!-- 文件选择 -->
                         <input type="file"
-                               class="form-control {% if field.field_key in errors %}is-invalid{% endif %}"
+                               class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
                                id="{{ field.field_key }}"
                                name="{{ field.field_key }}"
                                accept="image/*"
                                onchange="handleImageSelect(this, '{{ field.field_key }}_preview_container', '{{ field.field_key }}_base64')"
-                               {% if field.is_required %}required{% endif %}>
+                               {% if field.is_readonly %}disabled{% endif %}
+                               {% if field.is_required and not field.is_readonly %}required{% endif %}>
 
                     {% elif field.field_type == 'image' %}
                         <!-- 图片预览区域 -->

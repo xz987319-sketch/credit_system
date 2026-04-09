@@ -625,6 +625,15 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
                         del dynamic_data[field.field_key]
 
             obj.form_data = dynamic_data
+
+            # 同步 AMOUNT 到 application.amount（与 _save_return_application 保持一致）
+            amount_str = dynamic_data.get('AMOUNT') or dynamic_data.get('amount')
+            if amount_str:
+                try:
+                    obj.amount = Decimal(amount_str.replace(',', '').strip())
+                except Exception:
+                    pass  # 保持原值
+
             obj.status = Application.ST_PENDING_FIRST  # 重置为待初审
             obj.return_reason = ""  # 清空退回原因
             print(f"[DEBUG return_edit] 保存前 - application.status={application.status}, form_data keys={list(dynamic_data.keys())}")
