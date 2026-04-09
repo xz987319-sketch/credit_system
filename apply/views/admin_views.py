@@ -68,7 +68,9 @@ def credit_pass_view(request, pk: int):  # 信审通过发卡
     now = timezone.now()  # 获取当前时间戳
     application.card_number = card_number  # 写入卡号字段
     application.status = Application.ST_ISSUED  # 标记已发卡
-    application.credit_time = now  # 记录信审处理时间
+    application.credit_time = now  # 记录信审结束时间
+    application.credit_audit_time = now  # 记录信审通过时间
+    application.issued_time = now  # 记录已发卡时间
     application.issue_data = {  # 组装 JSON 快照字典
         "card_number": card_number,  # 卡号
         "issue_amount": str(application.amount),  # 发卡额度字符串化
@@ -76,6 +78,7 @@ def credit_pass_view(request, pk: int):  # 信审通过发卡
         "applicant_name": application.applicant_name,  # 姓名快照
         "id_card": application.id_card,  # 证件快照
         "product_name": application.card_product.product_name,  # 卡种名称快照
+        "form_data": dict(application.form_data or {}),  # 动态表单数据快照
     }
     application.save()  # 持久化所有变更字段
     messages.success(  # 成功提示并带上卡号便于核对

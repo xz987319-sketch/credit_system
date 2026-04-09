@@ -58,7 +58,10 @@ class Application(models.Model):  # 定义信贷申请业务主表
     return_reason = models.TextField(blank=True, default="", verbose_name="退回原因")  # 初审退回说明
     supplementary_note = models.TextField(blank=True, default="", verbose_name="补充说明")  # 客户补充说明
     init_audit_time = models.DateTimeField(null=True, blank=True, verbose_name="初审通过时间")  # 初审通过时刻
-    credit_time = models.DateTimeField(null=True, blank=True, verbose_name="信审时间")  # 信审处理时刻
+    second_audit_time = models.DateTimeField(null=True, blank=True, verbose_name="复审通过时间")  # 复审通过时刻
+    credit_audit_time = models.DateTimeField(null=True, blank=True, verbose_name="信审通过时间")  # 信审通过时刻
+    issued_time = models.DateTimeField(null=True, blank=True, verbose_name="已发卡时间")  # 已发卡时刻
+    credit_time = models.DateTimeField(null=True, blank=True, verbose_name="信审结束时间")  # 信审结束时刻（通过或拒绝）
     credit_remark = models.TextField(blank=True, default="", verbose_name="信审备注")  # 仅记录信审拒绝等原因
     second_reject_reason = models.TextField(blank=True, default="", verbose_name="复审拒绝原因")  # 复审拒绝专用说明
     issue_data = models.JSONField(null=True, blank=True, verbose_name="发卡快照")  # 发卡 JSON 快照用于比对

@@ -85,6 +85,47 @@
 {% include "includes/_dynamic_fields.html" with mode="readonly" form_pages=form_pages form_data=form_data %}
 {% endif %}
 
+{# ====== 审核记录 ====== #}
+{% if application.init_audit_time or application.second_audit_time or application.credit_audit_time or application.issued_time %}
+<div class="card mb-3 border-info">
+    <div class="card-header bg-info text-white">
+        <i class="bi bi-clock-history me-1"></i>审核记录
+    </div>
+    <div class="card-body">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-calendar-plus me-2 text-muted"></i>提交时间</span>
+                <span class="text-muted">{{ application.created_at }}</span>
+            </li>
+            {% if application.init_audit_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-check-circle me-2 text-success"></i>初审时间</span>
+                <span class="text-muted">{{ application.init_audit_time }}</span>
+            </li>
+            {% endif %}
+            {% if application.second_audit_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-check-circle me-2 text-info"></i>复审时间</span>
+                <span class="text-muted">{{ application.second_audit_time }}</span>
+            </li>
+            {% endif %}
+            {% if application.credit_audit_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-shield-check me-2 text-primary"></i>信审时间</span>
+                <span class="text-muted">{{ application.credit_audit_time }}</span>
+            </li>
+            {% endif %}
+            {% if application.issued_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-credit-card-2-front me-2 text-success"></i>已发卡时间</span>
+                <span class="text-muted">{{ application.issued_time }}</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
 {# ====== 发卡数据比对 ====== #}
 {% if compare_rows %}
 <h2 class="h6 mt-4"><i class="bi bi-arrow-left-right me-1"></i>发卡数据比对</h2>
@@ -92,7 +133,7 @@
 <table class="table table-bordered table-sm">
     <thead>
         <tr>
-            <th>字段</th>
+            <th style="width: 120px;">字段</th>
             <th>原始申请</th>
             <th>发卡快照</th>
         </tr>
@@ -100,7 +141,7 @@
     <tbody>
     {% for row in compare_rows %}
         <tr>
-            <td>{{ row.label }}</td>
+            <td style="width: 120px;">{{ row.label }}</td>
             <td class="{% if row.mismatch %}table-mismatch{% endif %}">{{ row.original }}</td>
             <td class="{% if row.mismatch %}table-mismatch{% endif %}">{{ row.issued }}</td>
         </tr>

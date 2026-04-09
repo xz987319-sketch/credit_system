@@ -160,7 +160,8 @@ def pending_second_pass_view(request, pk: int):  # 复审通过进入信审
         messages.warning(request, "状态已变化")  # 提示
         return redirect("apply:pending_second")  # 回列表
     application.status = Application.ST_CREDIT_ING  # 进入信审
-    application.save(update_fields=["status", "updated_at"])  # 保存
+    application.second_audit_time = timezone.now()  # 记录复审通过时间
+    application.save(update_fields=["status", "second_audit_time", "updated_at"])  # 保存
     messages.success(request, "复审已通过，已进入信审")  # 提示
     return redirect("apply:pending_second")  # 回列表
 

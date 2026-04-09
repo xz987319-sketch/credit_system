@@ -2,7 +2,7 @@
 from django.urls import path  # 导入 path
 
 from apply.views import employee  # 导入员工视图
-from apply.views.multi_step_form import multi_step_form_view, pinyin_convert_api  # 导入分步表单视图和拼音API
+from apply.views.multi_step_form import multi_step_form_view, pinyin_convert_api, check_duplicate_view  # 导入分步表单视图和拼音API
 
 urlpatterns = [  # 员工端路由
     path("apply/", employee.employee_apply_view, name="employee_apply"),  # 员工信用卡申请入口
@@ -16,4 +16,6 @@ urlpatterns = [  # 员工端路由
     path("application/<int:pk>/", employee.application_detail_view, name="application_detail"),  # 申请详情比对
     # 拼音转换API
     path("api/pinyin/", pinyin_convert_api, name="pinyin_convert"),  # /employee/api/pinyin/?name=张三
+    # 防重检测API
+    path("api/check-duplicate/", check_duplicate_view, name="check_duplicate"),  # /employee/api/check-duplicate/?id_card=xxx&product_id=1
 ]

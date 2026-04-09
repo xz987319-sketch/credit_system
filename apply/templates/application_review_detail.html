@@ -108,7 +108,7 @@
 {% endif %}
 
 {# ====== 审核记录时间线 ====== #}
-{% if application.init_audit_time or application.second_audit_time or application.credit_audit_time %}
+{% if application.init_audit_time or application.second_audit_time or application.credit_audit_time or application.issued_time %}
 <div class="card mb-4">
     <div class="card-header">
         <i class="bi bi-clock-history me-1"></i>审核记录
@@ -135,6 +135,12 @@
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-shield-check me-2 text-primary"></i>信审时间</span>
                 <span class="text-muted">{{ application.credit_audit_time }}</span>
+            </li>
+            {% endif %}
+            {% if application.issued_time %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-credit-card-2-front me-2 text-success"></i>已发卡时间</span>
+                <span class="text-muted">{{ application.issued_time }}</span>
             </li>
             {% endif %}
         </ul>

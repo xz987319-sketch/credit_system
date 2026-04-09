@@ -198,10 +198,11 @@
                         {# 文本输入 #}
                         {% elif field.field_type == 'text' %}
                             <input type="text"
-                                   class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
+                                   class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.validation_rule == 'name' or "姓名" in field.field_label or "联系人姓名" in field.field_label %}name-source-field{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
                                    id="{{ field.field_key }}"
                                    name="{{ field.field_key }}"
                                    value="{{ page_data|get_item:field.field_key }}"
+                                   {% if not field.is_readonly and field.validation_rule == 'name' or "姓名" in field.field_label or "联系人姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
                             <div class="invalid-feedback"></div>
@@ -243,7 +244,7 @@
                                    placeholder="{{ field.placeholder|default:'请输入18位身份证号' }}"
                                    maxlength="{{ field.max_length|default:'18' }}"
                                    data-is-idcard="true"
-                                   {% if not field.is_readonly %}onblur="parseIdCard(this)"{% endif %}
+                                   {% if not field.is_readonly %}oninput="this.value=this.value.replace(/x/g,'X')" onblur="parseIdCard(this)"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
                             <div class="invalid-feedback"></div>
@@ -380,7 +381,7 @@
                 {% if is_last %}
                     <button type="submit" class="btn-submit w-100 post-confirm">提交申请</button>
                 {% else %}
-                    <button type="submit" class="btn-next w-100">下一步</button>
+                    <button type="button" class="btn-next w-100" id="h5NextStepBtn">下一步</button>
                 {% endif %}
             </div>
         </form>
@@ -721,7 +722,7 @@
         }
 
         // 表单提交时的完整校验
-        function validateFormOnSubmit(form) {
+        async function validateFormOnSubmit(form) {
             // ===== 1. 必填字段通用校验 =====
             var requiredFields = form.querySelectorAll('[required]');
             var firstEmpty = null;
@@ -789,9 +790,27 @@
                 }
             }
 
-            // ===== 6. 身份证一致性校验 =====
+            // ===== 5.5 第1步防重检测 =====
+            var currentStep = parseInt('{{ current_step }}', 10);
+            var isLastStep = document.querySelector('input[name="is_last"]').value === 'true';
             var idCardInput = document.querySelector('input[data-is-idcard="true"]');
             var idCardValue = idCardInput ? idCardInput.value.trim() : '';
+            if (currentStep === 0 && !isLastStep && idCardValue) {
+                // 第1步且有身份证号时，检测是否已持有该卡种
+                try {
+                    var checkResponse = await fetch('/api/check-duplicate/?id_card=' + encodeURIComponent(idCardValue) + '&product_id={{ product.id }}');
+                    var checkResult = await checkResponse.json();
+                    if (checkResult.has_duplicate) {
+                        alert(checkResult.message || '您已拥有该卡种，不可重复申请');
+                        if (idCardInput) idCardInput.focus();
+                        return false;
+                    }
+                } catch (e) {
+                    console.error('防重检测失败:', e);
+                }
+            }
+
+            // ===== 6. 身份证一致性校验 =====
             var birthDateInput = document.querySelector('input[data-is-birthdate="true"]');
             var birthDateValue = birthDateInput ? birthDateInput.value.trim() : '';
             var genderInput = document.querySelector('select[data-is-gender="true"]');
@@ -1123,6 +1142,173 @@
             });
         }
     });
+
+    // ===== H5 下一步按钮点击事件：处理异步防重检测 =====
+    (function() {
+        var nextBtn = document.getElementById('h5NextStepBtn');
+        if (!nextBtn) {
+            console.log('[DEBUG-H5] 下一步按钮未找到 (id=h5NextStepBtn)');
+            return;
+        }
+
+        console.log('[DEBUG-H5] 下一步按钮已找到，准备绑定点击事件');
+        
+        nextBtn.addEventListener('click', async function(e) {
+            console.log('[DEBUG-H5] ========== 下一步按钮点击事件触发 ==========');
+            e.preventDefault();
+            console.log('[DEBUG-H5] 已执行 e.preventDefault()');
+
+            var form = document.querySelector('form');
+            if (!form) {
+                console.log('[DEBUG-H5] 表单未找到!');
+                return;
+            }
+            console.log('[DEBUG-H5] 表单已找到，currentStep={{ current_step }}');
+
+            // ===== 1. 必填字段通用校验（与原 validateFormOnSubmit 相同逻辑）=====
+            var requiredFields = form.querySelectorAll('[required]');
+            console.log('[DEBUG-H5] 找到 ' + requiredFields.length + ' 个必填字段');
+            var firstEmpty = null;
+            for (var i = 0; i < requiredFields.length; i++) {
+                var f = requiredFields[i];
+                var val = f.value ? f.value.trim() : '';
+                if (!val) {
+                    f.classList.add('is-invalid');
+                    var fb = f.nextElementSibling;
+                    if (!fb || !fb.classList.contains('invalid-feedback')) {
+                        fb = f.parentElement.querySelector('.invalid-feedback');
+                    }
+                    if (fb && fb.classList.contains('invalid-feedback')) {
+                        var fieldId = f.id || f.getAttribute('name');
+                        var label = fieldId ? document.querySelector('label[for="' + fieldId + '"]') : null;
+                        var fieldLabel = label ? label.textContent.replace(/[*""]/g, '').trim() : fieldId;
+                        fb.textContent = '"' + fieldLabel + '"为必填项';
+                        fb.style.display = 'block';
+                    }
+                    if (!firstEmpty) firstEmpty = f;
+                } else {
+                    clearInvalid(f);
+                }
+            }
+            if (firstEmpty) {
+                console.log('[DEBUG-H5] 必填字段校验失败，停留在当前页');
+                firstEmpty.focus();
+                return;
+            }
+            console.log('[DEBUG-H5] 必填字段校验通过');
+
+            // ===== 2. 姓名格式校验 =====
+            var nameFields = document.querySelectorAll('.name-source-field');
+            for (var i = 0; i < nameFields.length; i++) {
+                if (!validateName(nameFields[i])) {
+                    console.log('[DEBUG-H5] 姓名格式校验失败');
+                    nameFields[i].focus();
+                    return;
+                }
+            }
+            console.log('[DEBUG-H5] 姓名格式校验通过');
+
+            // ===== 3. 格式字段重扫：身份证号 =====
+            var idCardInputs = document.querySelectorAll('input[data-is-idcard="true"]');
+            for (var i = 0; i < idCardInputs.length; i++) {
+                if (!validateIdCard(idCardInputs[i])) {
+                    console.log('[DEBUG-H5] 身份证格式校验失败');
+                    idCardInputs[i].focus();
+                    return;
+                }
+            }
+            console.log('[DEBUG-H5] 身份证格式校验通过');
+
+            // ===== 4. 格式字段重扫：手机号 =====
+            var phoneInputs = document.querySelectorAll('input[data-is-phone="true"]');
+            for (var i = 0; i < phoneInputs.length; i++) {
+                if (!validatePhone(phoneInputs[i])) {
+                    console.log('[DEBUG-H5] 手机号格式校验失败');
+                    phoneInputs[i].focus();
+                    return;
+                }
+            }
+            console.log('[DEBUG-H5] 手机号格式校验通过');
+
+            // ===== 5. 格式字段重扫：金额 =====
+            var amountInputs = document.querySelectorAll('input[data-is-amount="true"]');
+            for (var i = 0; i < amountInputs.length; i++) {
+                if (!validateAmount(amountInputs[i])) {
+                    console.log('[DEBUG-H5] 金额格式校验失败');
+                    amountInputs[i].focus();
+                    return;
+                }
+            }
+            console.log('[DEBUG-H5] 金额格式校验通过');
+
+            // ===== 6. 第1步防重检测（异步）=====
+            var idCardInput = document.querySelector('input[data-is-idcard="true"]');
+            var idCardValue = idCardInput ? idCardInput.value.trim().toUpperCase() : '';
+            var currentStep = parseInt('{{ current_step }}', 10);
+            console.log('[DEBUG-H5] currentStep=' + currentStep + ', idCardValue=' + idCardValue);
+            
+            if (currentStep === 0 && idCardValue) {
+                console.log('[DEBUG-H5] 执行防重检测，API请求开始...');
+                try {
+                    var checkUrl = '/api/check-duplicate/?id_card=' + encodeURIComponent(idCardValue) + '&product_id={{ product.id }}';
+                    console.log('[DEBUG-H5] 请求URL: ' + checkUrl);
+                    var checkResponse = await fetch(checkUrl);
+                    console.log('[DEBUG-H5] API响应状态: ' + checkResponse.status);
+                    var checkResult = await checkResponse.json();
+                    console.log('[DEBUG-H5] API返回数据: ' + JSON.stringify(checkResult));
+                    
+                    if (checkResult.has_duplicate) {
+                        console.log('[DEBUG-H5] 检测到重复申请，弹出提示');
+                        alert(checkResult.message || '您已拥有该卡种，不可重复申请');
+                        if (idCardInput) idCardInput.focus();
+                        console.log('[DEBUG-H5] 已阻止提交，停留在当前页');
+                        return;
+                    } else {
+                        console.log('[DEBUG-H5] 无重复申请，继续提交');
+                    }
+                } catch (e) {
+                    console.error('[DEBUG-H5] 防重检测失败:', e);
+                    // 网络错误时不阻止提交，继续
+                    console.log('[DEBUG-H5] 网络异常，继续提交');
+                }
+            } else {
+                console.log('[DEBUG-H5] 跳过防重检测 (currentStep=' + currentStep + ' 或 idCardValue为空)');
+            }
+
+            // ===== 7. 身份证一致性校验 =====
+            var birthDateInput = document.querySelector('input[data-is-birthdate="true"]');
+            var birthDateValue = birthDateInput ? birthDateInput.value.trim() : '';
+            var genderInput = document.querySelector('select[data-is-gender="true"]');
+            var genderValue = genderInput ? genderInput.value : '';
+
+            if (idCardValue && /^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dX]$/i.test(idCardValue)) {
+                var consistencyResult = validateIdCardConsistency(idCardValue, birthDateValue, genderValue);
+                if (!consistencyResult.valid) {
+                    console.log('[DEBUG-H5] 身份证一致性校验失败');
+                    alert(consistencyResult.message);
+                    if (birthDateInput) birthDateInput.focus();
+                    return;
+                }
+            }
+            console.log('[DEBUG-H5] 身份证一致性校验通过');
+
+            // ===== 8. 年龄校验 =====
+            if (idCardValue && birthDateValue) {
+                var ageResult = validateApplicantAge(idCardValue, birthDateValue);
+                if (!ageResult.valid) {
+                    console.log('[DEBUG-H5] 年龄校验失败');
+                    alert(ageResult.message);
+                    return;
+                }
+            }
+            console.log('[DEBUG-H5] 年龄校验通过');
+
+            // 所有校验通过，提交表单
+            console.log('[DEBUG-H5] 所有校验通过，执行 form.submit()');
+            form.submit();
+            console.log('[DEBUG-H5] form.submit() 已调用');
+        });
+    })();
     </script>
 </body>
 </html>

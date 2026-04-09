@@ -16,6 +16,7 @@ from django.views.decorators.csrf import csrf_exempt
 import uuid
 
 from apply.models import FormPage, FormField, CardProduct, Application
+from apply.utils.apply_duplicate import id_card_holds_card_product
 from apply.utils.applicant_validate import (
     clean_applicant_name,
     clean_cn_mobile,
@@ -51,6 +52,36 @@ SURNAME_POLYPHONOUS_MAP = {
     '迮': 'ZE',      # 姓迮
     '俎': 'ZU',      # 姓俎
 }
+
+
+# ============================================================================
+# 防重检测接口
+# ============================================================================
+
+@require_http_methods(["GET"])
+def check_duplicate_view(request):
+    """
+    AJAX接口：检测身份证号是否已持有该卡种。
+    用于第1步点击"下一步"前的防重拦截。
+    """
+    id_card = request.GET.get('id_card', '').strip().upper()
+    product_id = request.GET.get('product_id', '')
+
+    if not id_card or not product_id:
+        return JsonResponse({'has_duplicate': False, 'message': ''})
+
+    try:
+        product = CardProduct.objects.get(pk=product_id, is_active=True)
+    except CardProduct.DoesNotExist:
+        return JsonResponse({'has_duplicate': False, 'message': '卡产品不存在'})
+
+    if id_card_holds_card_product(id_card, product.pk, exclude_pk=None):
+        return JsonResponse({
+            'has_duplicate': True,
+            'message': '您已拥有该卡种，不可重复申请'
+        })
+
+    return JsonResponse({'has_duplicate': False, 'message': ''})
 
 
 # 中文姓名转拼音函数（使用 pypinyin 库）
@@ -531,7 +562,12 @@ def multi_step_form_view(request, product_id):
         if is_last:
             # 标记 Token 为已用，防止刷新重提
             request.session['form_token_used'] = True
-            return _save_application(request, session_data, product, user_bank)
+            result = _save_application(request, session_data, product, user_bank)
+            # 处理防重校验返回的错误
+            if isinstance(result, dict) and not result.get("success", True):
+                messages.error(request, result.get("error", "申请提交失败"))
+                return redirect(f'{request.path}?step={step}')
+            return result
         else:
             # 返回下一步
             return redirect(f'{request.path}?step={step + 1}')
@@ -596,7 +632,7 @@ def _save_application(request, form_data, product, user_bank):
 
     # 通过field_key直接获取值，而不是通过field_type
     applicant_name = form_data.get('applicant_name', '')
-    id_card = form_data.get('id_card', '')
+    id_card = form_data.get('id_card', '').upper()  # 统一大写，防止x/X不一致
     phone = form_data.get('phone', '')
     amount_str = form_data.get('AMOUNT', '0')  # 直接使用正确的field_key
     bank_code = form_data.get('bank_code', product.bank.bank_code)
@@ -610,6 +646,11 @@ def _save_application(request, form_data, product, user_bank):
         amount = Decimal(amount_str)
     except Exception:
         amount = Decimal('0')
+
+    # 【申请防重校验】同一身份证对同一卡种不可重复申请
+    if id_card_holds_card_product(id_card, product.pk, exclude_pk=None):
+        logger.warning(f"[防重] 身份证 {id_card} 已持有卡种 {product.product_name}，拒绝新建申请")
+        return {"success": False, "error": "您已拥有该卡种，不可重复申请"}
 
     # 创建申请记录
     app = Application.objects.create(
@@ -757,7 +798,12 @@ def h5_multi_step_form_view(request, product_id):
         if is_last:
             # 标记 Token 为已用，防止刷新重提
             request.session['form_token_used'] = True
-            return _h5_save_application(request, session_data, product)
+            result = _h5_save_application(request, session_data, product)
+            # 处理防重校验返回的错误
+            if isinstance(result, dict) and not result.get("success", True):
+                messages.error(request, result.get("error", "申请提交失败"))
+                return redirect(f'{request.path}?step={step}')
+            return result
         else:
             return redirect(f'{request.path}?step={step + 1}')
 
@@ -814,7 +860,7 @@ def _h5_save_application(request, form_data, product):
 
     # 直接使用正确的field_key获取值
     applicant_name = form_data.get('applicant_name', '')
-    id_card = form_data.get('id_card', '')
+    id_card = form_data.get('id_card', '').upper()  # 统一大写，防止x/X不一致
     phone = form_data.get('phone', '')
     amount_str = form_data.get('AMOUNT', '0')  # 直接使用正确的field_key
     bank_code = form_data.get('bank_code', product.bank.bank_code)
@@ -827,6 +873,11 @@ def _h5_save_application(request, form_data, product):
         amount = Decimal(amount_str)
     except Exception:
         amount = Decimal('0')
+
+    # 【申请防重校验】同一身份证对同一卡种不可重复申请
+    if id_card_holds_card_product(id_card, product.pk, exclude_pk=None):
+        logger.warning(f"[防重] H5端身份证 {id_card} 已持有卡种 {product.product_name}，拒绝新建申请")
+        return {"success": False, "error": "您已拥有该卡种，不可重复申请"}
 
     app = Application.objects.create(
         user=request.user if request.user.is_authenticated else None,
