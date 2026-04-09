@@ -355,6 +355,8 @@
                                    {% if field.is_required %}required{% endif %}>
                             <!-- 文件名显示 -->
                             <div class="small text-muted mt-1" id="{{ field.field_key }}_filename"></div>
+                            <!-- 错误提示 -->
+                            <div class="invalid-feedback"></div>
                         {% else %}
                             <input type="text"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.field_key == 'bank_code' %}bg-light text-secondary{% endif %}"
@@ -543,13 +545,13 @@
                 return false;
             }
 
-            // 少数民族·分段校验：每段至少包含2个汉字
+            // 少数民族·分段校验：每段至少包含2个汉字（非空时才校验）
             var segments = value.split('·');
             for (var i = 0; i < segments.length; i++) {
                 var seg = segments[i];
                 var chineseChars = seg.match(/[\u4e00-\u9fff]/g);
                 var chineseCount = chineseChars ? chineseChars.length : 0;
-                if (chineseCount < 2) {
+                if (value && chineseCount < 2) {
                     input.classList.add('is-invalid');
                     if (feedback && feedback.classList.contains('invalid-feedback')) {
                         feedback.textContent = '姓名须为2～15个汉字';
@@ -744,6 +746,9 @@
                         fb.style.display = 'block';
                     }
                     if (!firstEmpty) firstEmpty = f;
+                } else {
+                    // 有值时清除之前的错误提示
+                    clearInvalid(f);
                 }
             }
             if (firstEmpty) {
@@ -874,9 +879,14 @@
         function clearInvalid(input) {
             if (input.classList.contains('is-invalid')) {
                 input.classList.remove('is-invalid');
-                var feedback = input.nextElementSibling;
-                if (feedback && feedback.classList.contains('invalid-feedback')) {
-                    feedback.style.display = '';
+                // 查找 invalid-feedback 元素（可能是直接兄弟或更远的兄弟）
+                var sibling = input.nextElementSibling;
+                while (sibling) {
+                    if (sibling.classList.contains('invalid-feedback')) {
+                        sibling.style.display = '';
+                        break;
+                    }
+                    sibling = sibling.nextElementSibling;
                 }
             }
         }
@@ -927,7 +937,7 @@
             }
         })();
         {% endif %}
-        {% if field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
+        {% if field.field_type == 'amount' or field.field_type == 'number' or field.validation_rule == 'amount_range' %}
         (function() {
             var input = document.querySelector('input[name="{{ field.field_key }}"]');
             if (input) {
@@ -1065,6 +1075,8 @@
                     + '<div class="text-muted" style="font-size:11px;margin-top:4px;">已压缩至 ' + (finalSize / 1024).toFixed(0) + ' KB</div>';
                 // 存储 base64
                 base64Input.value = base64;
+                // 清除错误提示
+                clearInvalid(input);
             });
         }
     </script>
