@@ -914,8 +914,13 @@
         (function() {
             var input = document.querySelector('input[name="{{ field.field_key }}"]');
             if (input) {
+                // 输入时过滤：只允许汉字和中间点(·)
+                input.addEventListener('input', function() {
+                    this.value = this.value.replace(/[^\u4e00-\u9fff·]/g, '');
+                    clearInvalid(this);
+                });
+                // 失去焦点时校验
                 input.addEventListener('blur', function() { validateName(this); });
-                input.addEventListener('input', function() { clearInvalid(this); });
             }
         })();
         {% endif %}
