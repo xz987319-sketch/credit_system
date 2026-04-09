@@ -161,11 +161,12 @@
         </div>
     </div>
 
-    <!-- 表单：非最后一步跳过确认弹窗 -->
-    <form method="post" class="form-card{% if not is_last %} no-post-confirm{% endif %}" id="stepForm" onsubmit="return validateFormOnSubmit(this);">
+    <!-- 表单 -->
+    <form method="post" class="form-card" id="stepForm" onsubmit="return validateFormOnSubmit(this);">
         {% csrf_token %}
         <input type="hidden" name="step" value="{{ current_step }}">
         <input type="hidden" name="is_last" value="{{ is_last|yesno:'true,false' }}">
+        <input type="hidden" name="_form_token" value="{{ form_token }}">
 
         <div class="card-header">
             <h4 class="card-title">{{ current_page.page.page_title }}</h4>
@@ -186,9 +187,20 @@
                                name="{{ field.field_key }}"
                                value="{{ page_data|get_item:field.field_key|default:'' }}"
                                placeholder="{{ field.placeholder }}"
-                               {% if field.validation_rule == 'name' and not field.is_readonly %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
+                               {% if not field.is_readonly and field.validation_rule == 'name' %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
+                               {% if not field.is_readonly and "姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
+
+                    {% elif field.field_type == 'name_pinyin' %}
+                        <input type="text"
+                               class="form-control bg-light"
+                               style="overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;"
+                               id="{{ field.field_key }}"
+                               name="{{ field.field_key }}"
+                               value="{{ page_data|get_item:field.field_key|default:'' }}"
+                               placeholder="根据中文姓名自动生成"
+                               readonly>
 
                     {% elif field.field_type == 'textarea' %}
                         <textarea                                   class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -222,7 +234,7 @@
                                data-field-type="date"
                               {% if 'birth' in field.field_key|lower %}data-is-birthdate="true"{% endif %}
                               {% if 'expiry' in field.field_key|lower or 'validity' in field.field_key|lower or field.field_key == 'AP_CED_DATE' %}data-is-idcard-expiry="true"{% endif %}
-                               {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
+                               {% if field.is_readonly or 'birth' in field.field_key|lower %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
 
                     {% elif field.field_type == 'phone' or field.validation_rule == 'phone' %}
@@ -233,6 +245,7 @@
                                value="{{ page_data|get_item:field.field_key|default:'' }}"
                                placeholder="{{ field.placeholder|default:'请输入手机号' }}"
                                maxlength="{{ field.max_length|default:'11' }}"
+                               data-is-phone="true"
                                {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
 
@@ -258,8 +271,10 @@
                                placeholder="{{ field.placeholder|default:'请输入姓名' }}"
                                maxlength="{{ field.max_length|default:'30' }}"
                                {% if not field.is_readonly %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
+                               {% if not field.is_readonly and "姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                        <div class="invalid-feedback"></div>
 
                     {% elif field.field_type == 'name_pinyin' %}
                         <input type="text"
@@ -279,6 +294,7 @@
                                value="{{ page_data|get_item:field.field_key|default:'' }}"
                                placeholder="{{ field.placeholder|default:'请输入申请金额' }}"
                                maxlength="{{ field.max_length|default:'12' }}"
+                               data-is-amount="true"
                                {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
 
@@ -329,10 +345,24 @@
                         </div>
 
                     {% elif field.field_type == 'file' %}
+                        <!-- 文件类型也支持图片预览（值是base64图片时显示） -->
+                        <div class="image-preview-container mb-2" id="{{ field.field_key }}_preview_container">
+                            {% with base64_data=page_data|get_item:field.field_key %}
+                            {% if base64_data and base64_data|slice:":22" == "data:image" %}
+                                <img src="{{ base64_data }}" class="img-thumbnail" style="max-width: 200px; max-height: 150px;">
+                                <p class="small text-muted">已有图片，如需更换请重新选择</p>
+                            {% endif %}
+                            {% endwith %}
+                        </div>
+                        <!-- 隐藏的 base64 存储字段 -->
+                        <input type="hidden" name="{{ field.field_key }}_base64" id="{{ field.field_key }}_base64" value="{{ page_data|get_item:field.field_key }}">
+                        <!-- 文件选择 -->
                         <input type="file"
                                class="form-control {% if field.field_key in errors %}is-invalid{% endif %}"
                                id="{{ field.field_key }}"
                                name="{{ field.field_key }}"
+                               accept="image/*"
+                               onchange="handleImageSelect(this, '{{ field.field_key }}_preview_container', '{{ field.field_key }}_base64')"
                                {% if field.is_required %}required{% endif %}>
 
                     {% elif field.field_type == 'image' %}
@@ -362,6 +392,8 @@
 
                     {% if field.field_key in errors %}
                         <div class="invalid-feedback d-block">{{ errors|get_item:field.field_key }}</div>
+                    {% elif field.is_required %}
+                        <div class="invalid-feedback" style="display:none;"></div>
                     {% endif %}
                 </div>
             {% endfor %}
@@ -370,16 +402,16 @@
 
         <div class="form-actions">
             {% if current_step > 0 %}
-                <button type="submit" name="prev_step" value="1" class="btn btn-secondary no-post-confirm">上一步</button>
+                <button type="submit" name="prev_step" value="1" class="btn btn-secondary">上一步</button>
             {% else %}
                 <div></div>
             {% endif %}
 
             {% if is_last %}
                 {% if is_return_edit %}
-                <button type="submit" class="btn btn-primary">提交并重新进入初审</button>
+                <button type="submit" class="btn btn-primary post-confirm">提交并重新进入初审</button>
                 {% else %}
-                <button type="submit" class="btn btn-primary">提交申请</button>
+                <button type="submit" class="btn btn-primary post-confirm">提交申请</button>
                 {% endif %}
             {% else %}
                 <button type="submit" class="btn btn-primary">下一步</button>
@@ -391,29 +423,69 @@
 
 {% block extra_js %}
 <script>
+    // ===== 防止重复提交：禁止返回已提交的表单 =====
+    (function() {
+        var SUBMITTED_KEY = 'form_submitted_pc_{{ product.id|default:"0" }}';
+        var loanProductListUrl = '{% url "apply:loan_product_list" %}';
+
+        // 进来就检查 sessionStorage 标记
+        if (sessionStorage.getItem(SUBMITTED_KEY)) {
+            sessionStorage.removeItem(SUBMITTED_KEY);
+            window.location.replace(loanProductListUrl);
+            return;
+        }
+
+        // 压入两条历史，保证 popstate 可被捕获
+        history.replaceState({form: 'active'}, '', location.href);
+        history.pushState({form: 'guard'}, '', location.href);
+
+        window.addEventListener('popstate', function(event) {
+            // 点了返回键 → 已提交则跳走，否则锁死
+            if (sessionStorage.getItem(SUBMITTED_KEY)) {
+                sessionStorage.removeItem(SUBMITTED_KEY);
+                window.location.replace(loanProductListUrl);
+            } else {
+                history.pushState({form: 'guard'}, '', location.href);
+            }
+        });
+    })();
+
+    // 最后一步提交时写入已提交标记
+    document.addEventListener('DOMContentLoaded', function() {
+        var form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function() {
+                var isLast = document.querySelector('input[name="is_last"]');
+                if (isLast && isLast.value === 'true') {
+                    sessionStorage.setItem('form_submitted_pc_{{ product.id|default:"0" }}', '1');
+                }
+            });
+        }
+    });
+
     // 中文姓名转拼音映射表
     var pinyinMap = {
         '阿': 'A', '啊': 'A', '爱': 'AI', '安': 'AN', '昂': 'ANG',
-        '八': 'BA', '巴': 'BA', '把': 'BA', '爸': 'BA', '白': 'BAI', '百': 'BAI', '柏': 'BAI', '拜': 'BAI', '班': 'BAN', '半': 'BAN', '邦': 'BANG', '包': 'BAO', '保': 'BAO', '北': 'BEI', '贝': 'BEI', '本': 'BEN', '比': 'BI', '必': 'BI', '毕': 'BI', '闭': 'BI', '边': 'BIAN', '变': 'BIAN', '便': 'BIAN', '别': 'BIE', '斌': 'BIN', '滨': 'BIN', '冰': 'BING', '丙': 'BING', '兵': 'BING', '并': 'BING', '波': 'BO', '博': 'BO', '伯': 'BO', '布': 'BU',
+        '八': 'BA', '捌': 'BA', '巴': 'BA', '把': 'BA', '爸': 'BA', '白': 'BAI', '百': 'BAI', '柏': 'BAI', '拜': 'BAI', '班': 'BAN', '半': 'BAN', '邦': 'BANG', '包': 'BAO', '保': 'BAO', '北': 'BEI', '贝': 'BEI', '本': 'BEN', '比': 'BI', '必': 'BI', '毕': 'BI', '闭': 'BI', '边': 'BIAN', '变': 'BIAN', '便': 'BIAN', '别': 'BIE', '斌': 'BIN', '滨': 'BIN', '冰': 'BING', '丙': 'BING', '兵': 'BING', '并': 'BING', '波': 'BO', '博': 'BO', '伯': 'BO', '布': 'BU',
         '才': 'CAI', '财': 'CAI', '彩': 'CAI', '菜': 'CAI', '蔡': 'CAI', '参': 'CAN', '餐': 'CAN', '残': 'CAN', '仓': 'CANG', '操': 'CAO', '曹': 'CAO', '册': 'CE', '测': 'CE', '策': 'CE', '层': 'CENG', '查': 'CHA', '茶': 'CHA', '差': 'CHA', '常': 'CHANG', '长': 'CHANG', '场': 'CHANG', '唱': 'CHANG', '超': 'CHAO', '朝': 'CHAO', '车': 'CHE', '陈': 'CHEN', '称': 'CHENG', '成': 'CHENG', '城': 'CHENG', '程': 'CHENG', '吃': 'CHI', '池': 'CHI', '持': 'CHI', '赤': 'CHI', '出': 'CHU', '初': 'CHU', '除': 'CHU', '楚': 'CHU', '储': 'CHU', '春': 'CHUN', '词': 'CI', '此': 'CI', '次': 'CI', '刺': 'CI', '从': 'CONG', '丛': 'CONG', '崔': 'CUI', '存': 'CUN', '寸': 'CUN', '措': 'CUO', '错': 'CUO',
         '达': 'DA', '大': 'DA', '代': 'DAI', '带': 'DAI', '待': 'DAI', '戴': 'DAI', '丹': 'DAN', '单': 'DAN', '胆': 'DAN', '蛋': 'DAN', '但': 'DAN', '诞': 'DAN', '淡': 'DAN', '当': 'DANG', '党': 'DANG', '刀': 'DAO', '导': 'DAO', '倒': 'DAO', '到': 'DAO', '道': 'DAO', '德': 'DE', '得': 'DE', '的': 'DE', '等': 'DENG', '邓': 'DENG', '低': 'DI', '滴': 'DI', '迪': 'DI', '敌': 'DI', '底': 'DI', '弟': 'DI', '帝': 'DI', '递': 'DI', '地': 'DI', '第': 'DI', '点': 'DIAN', '电': 'DIAN', '店': 'DIAN', '调': 'DIAO', '掉': 'DIAO', '丁': 'DING', '顶': 'DING', '定': 'DING', '丢': 'DIU', '东': 'DONG', '冬': 'DONG', '董': 'DONG', '动': 'DONG', '栋': 'DONG', '都': 'DU', '斗': 'DOU', '读': 'DU', '独': 'DU', '杜': 'DU', '度': 'DU', '段': 'DUAN', '断': 'DUAN', '缎': 'DUAN', '对': 'DUI', '队': 'DUI', '吨': 'DUN', '顿': 'DUN', '多': 'DUO',
         '额': 'E', '俄': 'E', '恶': 'E', '饿': 'E', '恩': 'EN', '儿': 'ER', '耳': 'ER', '二': 'ER',
         '法': 'FA', '发': 'FA', '范': 'FAN', '方': 'FANG', '防': 'FANG', '房': 'FANG', '飞': 'FEI', '费': 'FEI', '分': 'FEN', '纷': 'FEN', '粉': 'FEN', '份': 'FEN', '丰': 'FENG', '风': 'FENG', '封': 'FENG', '冯': 'FENG', '凤': 'FENG', '奉': 'FENG', '佛': 'FO', '否': 'FOU', '夫': 'FU', '父': 'FU', '付': 'FU', '服': 'FU', '福': 'FU', '辅': 'FU', '复': 'FU', '负': 'FU', '傅': 'FU', '富': 'FU',
         '嘎': 'GA', '该': 'GAI', '改': 'GAI', '盖': 'GAI', '干': 'GAN', '杆': 'GAN', '感': 'GAN', '刚': 'GANG', '钢': 'GANG', '高': 'GAO', '告': 'GAO', '歌': 'GE', '格': 'GE', '个': 'GE', '给': 'GEI', '根': 'GEN', '跟': 'GEN', '更': 'GENG', '工': 'GONG', '公': 'GONG', '功': 'GONG', '供': 'GONG', '共': 'GONG', '狗': 'GOU', '够': 'GOU', '古': 'GU', '谷': 'GU', '股': 'GU', '骨': 'GU', '顾': 'GU', '固': 'GU', '故': 'GU', '瓜': 'GUA', '挂': 'GUA', '关': 'GUAN', '管': 'GUAN', '官': 'GUAN', '观': 'GUAN', '光': 'GUANG', '广': 'GUANG', '贵': 'GUI', '桂': 'GUI', '滚': 'GUN', '郭': 'GUO', '国': 'GUO', '果': 'GUO',
         '哈': 'HA', '还': 'HAI', '海': 'HAI', '害': 'HAI', '韩': 'HAN', '汉': 'HAN', '行': 'HANG', '航': 'HANG', '好': 'HAO', '号': 'HAO', '浩': 'HAO', '何': 'HE', '合': 'HE', '和': 'HE', '河': 'HE', '荷': 'HE', '黑': 'HEI', '很': 'HEN', '红': 'HONG', '洪': 'HONG', '后': 'HOU', '候': 'HOU', '胡': 'HU', '虎': 'HU', '护': 'HU', '互': 'HU', '户': 'HU', '花': 'HUA', '华': 'HUA', '化': 'HUA', '画': 'HUA', '划': 'HUA', '话': 'HUA', '怀': 'HUAI', '坏': 'HUAI', '欢': 'HUAN', '还': 'HUAN', '环': 'HUAN', '换': 'HUAN', '黄': 'HUANG', '回': 'HUI', '汇': 'HUI', '会': 'HUI', '婚': 'HUN', '混': 'HUN', '活': 'HUO', '火': 'HUO', '或': 'HUO', '货': 'HUO',
-        '机': 'JI', '击': 'JI', '基': 'JI', '积': 'JI', '激': 'JI', '及': 'JI', '吉': 'JI', '级': 'JI', '极': 'JI', '即': 'JI', '急': 'JI', '集': 'JI', '纪': 'JI', '济': 'JI', '继': 'JI', '技': 'JI', '季': 'JI', '既': 'JI', '记': 'JI', '夹': 'JIA', '家': 'JIA', '加': 'JIA', '嘉': 'JIA', '贾': 'JIA', '甲': 'JIA', '假': 'JIA', '嫁': 'JIA', '架': 'JIA', '件': 'JIAN', '建': 'JIAN', '健': 'JIAN', '见': 'JIAN', '降': 'JIANG', '江': 'JIANG', '将': 'JIANG', '蒋': 'JIANG', '奖': 'JIANG', '讲': 'JIANG', '交': 'JIAO', '郊': 'JIAO', '浇': 'JIAO', '骄': 'JIAO', '胶': 'JIAO', '教': 'JIAO', '接': 'JIE', '街': 'JIE', '节': 'JIE', '姐': 'JIE', '解': 'JIE', '界': 'JIE', '借': 'JIE', '金': 'JIN', '今': 'JIN', '进': 'JIN', '近': 'JIN', '晋': 'JIN', '京': 'JING', '经': 'JING', '精': 'JING', '景': 'JING', '静': 'JING', '竟': 'JING', '境': 'JING', '敬': 'JING', '镜': 'JING', '纠': 'JIU', '九': 'JIU', '久': 'JIU', '酒': 'JIU', '旧': 'JIU', '救': 'JIU', '就': 'JIU', '居': 'JU', '局': 'JU', '菊': 'JU', '举': 'JU', '巨': 'JU', '具': 'JU', '聚': 'JU', '据': 'JU', '距': 'JU', '句': 'JU', '剧': 'JU', '觉': 'JUE', '绝': 'JUE', '军': 'JUN', '均': 'JUN', '君': 'JUN',
+        '机': 'JI', '击': 'JI', '基': 'JI', '积': 'JI', '激': 'JI', '及': 'JI', '吉': 'JI', '级': 'JI', '极': 'JI', '即': 'JI', '急': 'JI', '集': 'JI', '纪': 'JI', '济': 'JI', '继': 'JI', '技': 'JI', '季': 'JI', '既': 'JI', '记': 'JI', '夹': 'JIA', '家': 'JIA', '加': 'JIA', '嘉': 'JIA', '贾': 'JIA', '甲': 'JIA', '假': 'JIA', '嫁': 'JIA', '架': 'JIA', '件': 'JIAN', '建': 'JIAN', '健': 'JIAN', '见': 'JIAN', '降': 'JIANG', '江': 'JIANG', '将': 'JIANG', '蒋': 'JIANG', '奖': 'JIANG', '讲': 'JIANG', '交': 'JIAO', '郊': 'JIAO', '浇': 'JIAO', '骄': 'JIAO', '胶': 'JIAO', '教': 'JIAO', '接': 'JIE', '街': 'JIE', '节': 'JIE', '姐': 'JIE', '解': 'JIE', '界': 'JIE', '借': 'JIE', '金': 'JIN', '今': 'JIN', '进': 'JIN', '近': 'JIN', '晋': 'JIN', '京': 'JING', '经': 'JING', '精': 'JING', '景': 'JING', '静': 'JING', '竟': 'JING', '境': 'JING', '敬': 'JING', '镜': 'JING', '纠': 'JIU', '九': 'JIU', '玖': 'JIU', '久': 'JIU', '酒': 'JIU', '旧': 'JIU', '救': 'JIU', '就': 'JIU', '居': 'JU', '局': 'JU', '菊': 'JU', '举': 'JU', '巨': 'JU', '具': 'JU', '聚': 'JU', '据': 'JU', '距': 'JU', '句': 'JU', '剧': 'JU', '觉': 'JUE', '绝': 'JUE', '军': 'JUN', '均': 'JUN', '君': 'JUN',
         '卡': 'KA', '开': 'KAI', '看': 'KAN', '康': 'KANG', '抗': 'KANG', '考': 'KAO', '靠': 'KAO', '科': 'KE', '可': 'KE', '克': 'KE', '刻': 'KE', '客': 'KE', '课': 'KE', '孔': 'KONG', '口': 'KOU', '扣': 'KOU', '哭': 'KU', '苦': 'KU', '库': 'KU', '酷': 'KU', '跨': 'KUA', '块': 'KUAI', '快': 'KUAI', '宽': 'KUAN', '况': 'KUANG', '矿': 'KUANG', '亏': 'KUI', '愧': 'KUI', '昆': 'KUN', '困': 'KUN',
-        '拉': 'LA', '来': 'LAI', '赖': 'LAI', '兰': 'LAN', '蓝': 'LAN', '浪': 'LANG', '老': 'LAO', '乐': 'LE', '勒': 'LE', '雷': 'LEI', '泪': 'LEI', '类': 'LEI', '累': 'LEI', '冷': 'LENG', '离': 'LI', '里': 'LI', '理': 'LI', '礼': 'LI', '力': 'LI', '历': 'LI', '立': 'LI', '利': 'LI', '丽': 'LI', '联': 'LIAN', '连': 'LIAN', '脸': 'LIAN', '练': 'LIAN', '恋': 'LIAN', '凉': 'LIANG', '良': 'LIANG', '两': 'LIANG', '亮': 'LIANG', '量': 'LIANG', '梁': 'LIANG', '粮': 'LIANG', '林': 'LIN', '临': 'LIN', '灵': 'LING', '领': 'LING', '另': 'LING', '令': 'LING', '留': 'LIU', '流': 'LIU', '刘': 'LIU', '六': 'LIU', '龙': 'LONG', '楼': 'LOU', '陆': 'LU', '录': 'LU', '路': 'LU', '鹿': 'LU', '露': 'LU', '吕': 'LV', '旅': 'LV', '律': 'LV', '绿': 'LV', '虑': 'LV', '率': 'LV', '伦': 'LUN', '轮': 'LUN', '论': 'LUN', '罗': 'LUO', '洛': 'LUO', '骆': 'LUO',
+        '拉': 'LA', '来': 'LAI', '赖': 'LAI', '兰': 'LAN', '蓝': 'LAN', '浪': 'LANG', '老': 'LAO', '乐': 'LE', '勒': 'LE', '雷': 'LEI', '泪': 'LEI', '类': 'LEI', '累': 'LEI', '冷': 'LENG', '离': 'LI', '里': 'LI', '理': 'LI', '礼': 'LI', '力': 'LI', '历': 'LI', '立': 'LI', '利': 'LI', '丽': 'LI', '联': 'LIAN', '连': 'LIAN', '脸': 'LIAN', '练': 'LIAN', '恋': 'LIAN', '凉': 'LIANG', '良': 'LIANG', '两': 'LIANG', '亮': 'LIANG', '量': 'LIANG', '梁': 'LIANG', '粮': 'LIANG', '林': 'LIN', '临': 'LIN', '灵': 'LING', '领': 'LING', '零': 'LING', '另': 'LING', '令': 'LING', '留': 'LIU', '流': 'LIU', '刘': 'LIU', '六': 'LIU', '陆': 'LIU', '龙': 'LONG', '楼': 'LOU', '陆': 'LU', '录': 'LU', '路': 'LU', '鹿': 'LU', '露': 'LU', '吕': 'LV', '旅': 'LV', '律': 'LV', '绿': 'LV', '虑': 'LV', '率': 'LV', '伦': 'LUN', '轮': 'LUN', '论': 'LUN', '罗': 'LUO', '洛': 'LUO', '骆': 'LUO',
         '妈': 'MA', '马': 'MA', '吗': 'MA', '买': 'MAI', '麦': 'MAI', '卖': 'MAI', '满': 'MAN', '慢': 'MAN', '毛': 'MAO', '矛': 'MAO', '冒': 'MAO', '贸': 'MAO', '么': 'ME', '没': 'MEI', '每': 'MEI', '美': 'MEI', '妹': 'MEI', '门': 'MEN', '们': 'MEN', '梦': 'MENG', '孟': 'MENG', '米': 'MI', '迷': 'MI', '秘': 'MI', '密': 'MI', '面': 'MIAN', '苗': 'MIAO', '秒': 'MIAO', '民': 'MIN', '敏': 'MIN', '明': 'MING', '名': 'MING', '命': 'MING', '摸': 'MO', '模': 'MO', '末': 'MO', '莫': 'MO', '默': 'MO', '某': 'MOU', '母': 'MU', '木': 'MU', '目': 'MU', '墓': 'MU', '幕': 'MU', '慕': 'MU', '穆': 'MU',
         '拿': 'NA', '那': 'NA', '纳': 'NA', '娜': 'NA', '乃': 'NAI', '奶': 'NAI', '男': 'NAN', '南': 'NAN', '难': 'NAN', '囊': 'NANG', '脑': 'NAO', '闹': 'NAO', '呢': 'NE', '内': 'NEI', '能': 'NENG', '你': 'NI', '尼': 'NI', '年': 'NIAN', '念': 'NIAN', '娘': 'NIANG', '鸟': 'NIAO', '您': 'NIN', '宁': 'NING', '牛': 'NIU', '农': 'NONG', '弄': 'NONG', '努': 'NU', '女': 'NV', '暖': 'NUAN', '挪': 'NUO',
         '欧': 'OU',
-        '怕': 'PA', '拍': 'PAI', '排': 'PAI', '派': 'PAI', '潘': 'PAN', '盘': 'PAN', '判': 'PAN', '叛': 'PAN', '庞': 'PANG', '旁': 'PANG', '跑': 'PAO', '炮': 'PAO', '培': 'PEI', '赔': 'PEI', '配': 'PEI', '朋': 'PENG', '彭': 'PENG', '棚': 'PENG', '皮': 'PI', '片': 'PIAN', '偏': 'PIAN', '骗': 'PIAN', '飘': 'PIAO', '票': 'PIAO', '品': 'PIN', '平': 'PING', '凭': 'PING', '苹': 'PING', '屏': 'PING', '破': 'PO', '迫': 'PO', '颇': 'PO', '普': 'PU', '朴': 'PU', '谱': 'PU',
-        '七': 'QI', '期': 'QI', '戚': 'QI', '齐': 'QI', '其': 'QI', '奇': 'QI', '骑': 'QI', '起': 'QI', '气': 'QI', '汽': 'QI', '器': 'QI', '恰': 'QIA', '钱': 'QIAN', '前': 'QIAN', '潜': 'QIAN', '浅': 'QIAN', '强': 'QIANG', '墙': 'QIANG', '抢': 'QIANG', '桥': 'QIAO', '巧': 'QIAO', '青': 'QING', '轻': 'QING', '清': 'QING', '晴': 'QING', '情': 'QING', '请': 'QING', '庆': 'QING', '秋': 'QIU', '求': 'QIU', '球': 'QIU', '区': 'QU', '曲': 'QU', '取': 'QU', '去': 'QU', '全': 'QUAN', '权': 'QUAN', '泉': 'QUAN', '劝': 'QUAN', '缺': 'QUE', '却': 'QUE', '群': 'QUN',
+        '怕': 'PA', '拍': 'PAI', '排': 'PAI', '派': 'PAI', '茕': 'QIONG', '崴': 'WAI', '潘': 'PAN', '盘': 'PAN', '判': 'PAN', '叛': 'PAN', '庞': 'PANG', '旁': 'PANG', '跑': 'PAO', '炮': 'PAO', '培': 'PEI', '赔': 'PEI', '配': 'PEI', '朋': 'PENG', '彭': 'PENG', '棚': 'PENG', '皮': 'PI', '片': 'PIAN', '偏': 'PIAN', '骗': 'PIAN', '飘': 'PIAO', '票': 'PIAO', '品': 'PIN', '平': 'PING', '凭': 'PING', '苹': 'PING', '屏': 'PING', '破': 'PO', '迫': 'PO', '颇': 'PO', '普': 'PU', '朴': 'PU', '谱': 'PU',
+        '七': 'QI', '柒': 'QI', '期': 'QI', '戚': 'QI', '齐': 'QI', '其': 'QI', '奇': 'QI', '骑': 'QI', '起': 'QI', '气': 'QI', '汽': 'QI', '器': 'QI', '恰': 'QIA', '钱': 'QIAN', '前': 'QIAN', '潜': 'QIAN', '浅': 'QIAN', '强': 'QIANG', '墙': 'QIANG', '抢': 'QIANG', '桥': 'QIAO', '巧': 'QIAO', '青': 'QING', '轻': 'QING', '清': 'QING', '晴': 'QING', '情': 'QING', '请': 'QING', '庆': 'QING', '秋': 'QIU', '求': 'QIU', '球': 'QIU', '区': 'QU', '曲': 'QU', '取': 'QU', '去': 'QU', '全': 'QUAN', '权': 'QUAN', '泉': 'QUAN', '劝': 'QUAN', '缺': 'QUE', '却': 'QUE', '群': 'QUN',
         '然': 'RAN', '让': 'RANG', '绕': 'RAO', '热': 'RE', '人': 'REN', '认': 'REN', '日': 'RI', '容': 'RONG', '荣': 'RONG', '绒': 'RONG', '如': 'RU', '儒': 'RU', '软': 'RUAN', '锐': 'RUI', '瑞': 'RUI', '若': 'RUO',
         '撒': 'SA', '萨': 'SA', '三': 'SAN', '散': 'SAN', '桑': 'SANG', '丧': 'SANG', '扫': 'SAO', '色': 'SE', '森': 'SEN', '僧': 'SENG', '杀': 'SHA', '沙': 'SHA', '纱': 'SHA', '傻': 'SHA', '山': 'SHAN', '闪': 'SHAN', '陕': 'SHAN', '善': 'SHAN', '商': 'SHANG', '伤': 'SHANG', '上': 'SHANG', '尚': 'SHANG', '烧': 'SHAO', '少': 'SHAO', '绍': 'SHAO', '社': 'SHE', '舍': 'SHE', '射': 'SHE', '涉': 'SHE', '设': 'SHE', '谁': 'SHEI', '深': 'SHEN', '什': 'SHEN', '沈': 'SHEN', '审': 'SHEN', '甚': 'SHEN', '生': 'SHENG', '声': 'SHENG', '省': 'SHENG', '盛': 'SHENG', '剩': 'SHENG', '胜': 'SHENG', '师': 'SHI', '失': 'SHI', '施': 'SHI', '湿': 'SHI', '十': 'SHI', '石': 'SHI', '时': 'SHI', '实': 'SHI', '识': 'SHI', '史': 'SHI', '使': 'SHI', '始': 'SHI', '世': 'SHI', '市': 'SHI', '式': 'SHI', '事': 'SHI', '是': 'SHI', '室': 'SHI', '试': 'SHI', '视': 'SHI', '收': 'SHOU', '手': 'SHOU', '首': 'SHOU', '受': 'SHOU', '授': 'SHOU', '寿': 'SHOU', '兽': 'SHOU', '书': 'SHU', '树': 'SHU', '竖': 'SHU', '数': 'SHU', '双': 'SHUANG', '水': 'SHUI', '税': 'SHUI', '睡': 'SHUI', '顺': 'SHUN', '思': 'SI', '斯': 'SI', '死': 'SI', '四': 'SI', '寺': 'SI', '似': 'SI', '松': 'SONG', '送': 'SONG', '宋': 'SONG', '讼': 'SONG', '搜': 'SOU', '苏': 'SU', '诉': 'SU', '速': 'SU', '素': 'SU', '塑': 'SU', '酸': 'SUAN', '算': 'SUAN', '虽': 'SUI', '随': 'SUI', '岁': 'SUI', '孙': 'SUN', '损': 'SUN', '所': 'SUO', '索': 'SUO',
-        '他': 'TA', '她': 'TA', '它': 'TA', '塔': 'TA', '台': 'TAI', '太': 'TAI', '态': 'TAI', '抬': 'TAI', '谈': 'TAN', '坦': 'TAN', '探': 'TAN', '叹': 'TAN', '汤': 'TANG', '糖': 'TANG', '唐': 'TANG', '堂': 'TANG', '逃': 'TAO', '套': 'TAO', '特': 'TE', '疼': 'TENG', '腾': 'TENG', '提': 'TI', '题': 'TI', '体': 'TI', '替': 'TI', '天': 'TIAN', '田': 'TIAN', '甜': 'TIAN', '填': 'TIAN', '条': 'TIAO', '跳': 'TIAO', '铁': 'TIE', '贴': 'TIE', '听': 'TING', '停': 'TING', '庭': 'TING', '通': 'TONG', '同': 'TONG', '统': 'TONG', '痛': 'TONG', '头': 'TOU', '投': 'TOU', '透': 'TOU', '突': 'TU', '图': 'TU', '土': 'TU', '团': 'TUAN', '推': 'TUI', '腿': 'TUI', '退': 'TUI', '托': 'TUO', '脱': 'TUO',
+        '他': 'TA', '她': 'TA', '它': 'TA', '塔': 'TA', '台': 'TAI', '太': 'TAI', '态': 'TAI', '抬': 'TAI', '谈': 'TAN', '坦': 'TAN', '探': 'TAN', '叹': 'TAN', '汤': 'TANG', '糖': 'TANG', '唐': 'TANG', '堂': 'TANG', '逃': 'TAO', '套': 'TAO', '迢': 'TIAO', '特': 'TE', '疼': 'TENG', '腾': 'TENG', '提': 'TI', '题': 'TI', '体': 'TI', '替': 'TI', '天': 'TIAN', '田': 'TIAN', '甜': 'TIAN', '填': 'TIAN', '条': 'TIAO', '跳': 'TIAO', '铁': 'TIE', '贴': 'TIE', '听': 'TING', '停': 'TING', '庭': 'TING', '通': 'TONG', '同': 'TONG', '统': 'TONG', '痛': 'TONG', '头': 'TOU', '投': 'TOU', '透': 'TOU', '突': 'TU', '图': 'TU', '土': 'TU', '团': 'TUAN', '推': 'TUI', '腿': 'TUI', '退': 'TUI', '托': 'TUO', '脱': 'TUO',
         '娃': 'WA', '挖': 'WA', '瓦': 'WA', '外': 'WAI', '弯': 'WAN', '完': 'WAN', '玩': 'WAN', '晚': 'WAN', '万': 'WAN', '王': 'WANG', '往': 'WANG', '网': 'WANG', '望': 'WANG', '忘': 'WANG', '危': 'WEI', '威': 'WEI', '微': 'WEI', '为': 'WEI', '围': 'WEI', '维': 'WEI', '伟': 'WEI', '卫': 'WEI', '未': 'WEI', '位': 'WEI', '温': 'WEN', '文': 'WEN', '问': 'WEN', '我': 'WO', '卧': 'WO', '握': 'WO', '乌': 'WU', '无': 'WU', '五': 'WU', '午': 'WU', '武': 'WU', '舞': 'WU', '务': 'WU', '物': 'WU',
-        '西': 'XI', '希': 'XI', '息': 'XI', '习': 'XI', '洗': 'XI', '系': 'XI', '细': 'XI', '下': 'XIA', '夏': 'XIA', '厦': 'XIA', '仙': 'XIAN', '先': 'XIAN', '鲜': 'XIAN', '县': 'XIAN', '现': 'XIAN', '线': 'XIAN', '限': 'XIAN', '相': 'XIANG', '香': 'XIANG', '想': 'XIANG', '向': 'XIANG', '象': 'XIANG', '像': 'XIANG', '项': 'XIANG', '小': 'XIAO', '校': 'XIAO', '笑': 'XIAO', '效': 'XIAO', '些': 'XIE', '写': 'XIE', '谢': 'XIE', '新': 'XIN', '心': 'XIN', '信': 'XIN', '兴': 'XING', '星': 'XING', '行': 'XING', '形': 'XING', '醒': 'XING', '姓': 'XING', '凶': 'XIONG', '兄': 'XIONG', '熊': 'XIONG', '休': 'XIU', '修': 'XIU', '秀': 'XIU', '需': 'XU', '须': 'XU', '徐': 'XU', '许': 'XU', '序': 'XU', '血': 'XUE', '雪': 'XUE', '学': 'XUE', '讯': 'XUN', '训': 'XUN', '迅': 'XUN', '压': 'YA', '呀': 'YA', '牙': 'YA', '亚': 'YA', '研': 'YAN', '言': 'YAN', '严': 'YAN', '沿': 'YAN', '眼': 'YAN', '演': 'YAN', '阳': 'YANG', '扬': 'YANG', '羊': 'YANG', '洋': 'YANG', '养': 'YANG', '样': 'YANG', '腰': 'YAO', '摇': 'YAO', '药': 'YAO', '要': 'YAO', '野': 'YE', '业': 'YE', '夜': 'YE', '叶': 'YE', '页': 'YE', '一': 'YI', '医': 'YI', '衣': 'YI', '以': 'YI', '已': 'YI', '艺': 'YI', '易': 'YI', '意': 'YI', '义': 'YI', '因': 'YIN', '引': 'YIN', '银': 'YIN', '印': 'YIN', '英': 'YING', '影': 'YING', '应': 'YING', '用': 'YONG', '永': 'YONG', '泳': 'YONG', '勇': 'YONG', '涌': 'YONG', '你': 'YOU', '有': 'YOU', '由': 'YOU', '友': 'YOU', '右': 'YOU', '又': 'YOU', '幼': 'YOU', '鱼': 'YU', '于': 'YU', '余': 'YU', '雨': 'YU', '与': 'YU', '宇': 'YU', '语': 'YU', '玉': 'YU', '育': 'YU', '预': 'YU', '域': 'YU', '元': 'YUAN', '原': 'YUAN', '园': 'YUAN', '圆': 'YUAN', '远': 'YUAN', '院': 'YUAN', '愿': 'YUAN', '月': 'YUE', '越': 'YUE', '云': 'YUN', '运': 'YUN', '孕': 'YUN', '再': 'ZAI', '在': 'ZAI', '咱': 'ZAN', '暂': 'ZAN', '赞': 'ZAN', '脏': 'ZANG', '葬': 'ZANG', '早': 'ZAO', '枣': 'ZAO', '怎': 'ZEN', '增': 'ZENG', '扎': 'ZHA', '眨': 'ZHA', '炸': 'ZHA', '栅': 'ZHA', '占': 'ZHAN', '战': 'ZHAN', '站': 'ZHAN', '张': 'ZHANG', '掌': 'ZHANG', '丈': 'ZHANG', '仗': 'ZHANG', '账': 'ZHANG', '障': 'ZHANG', '招': 'ZHAO', '找': 'ZHAO', '照': 'ZHAO', '罩': 'ZHAO', '赵': 'ZHAO', '折': 'ZHE', '这': 'ZHE', '针': 'ZHEN', '真': 'ZHEN', '诊': 'ZHEN', '镇': 'ZHEN', '阵': 'ZHEN', '正': 'ZHENG', '政': 'ZHENG', '证': 'ZHENG', '郑': 'ZHENG', '只': 'ZHI', '知': 'ZHI', '之': 'ZHI', '支': 'ZHI', '直': 'ZHI', '职': 'ZHI', '植': 'ZHI', '值': 'ZHI', '至': 'ZHI', '治': 'ZHI', '志': 'ZHI', '制': 'ZHI', '质': 'ZHI', '致': 'ZHI', '中': 'ZHONG', '忠': 'ZHONG', '钟': 'ZHONG', '终': 'ZHONG', '种': 'ZHONG', '重': 'ZHONG', '州': 'ZHOU', '周': 'ZHOU', '洲': 'ZHOU', '粥': 'ZHOU', '竹': 'ZHU', '主': 'ZHU', '住': 'ZHU', '注': 'ZHU', '驻': 'ZHU', '柱': 'ZHU', '祝': 'ZHU', '著': 'ZHU', '抓': 'ZHU', '专': 'ZHUAN', '转': 'ZHUAN', '装': 'ZHUANG', '庄': 'ZHUANG', '壮': 'ZHUANG', '撞': 'ZHUANG', '追': 'ZHUI', '准': 'ZHUN', '卓': 'ZHUO', '桌': 'ZHUO', '捉': 'ZHUO', '浊': 'ZHUO', '资': 'ZI', '子': 'ZI', '自': 'ZI', '字': 'ZI', '紫': 'ZI', '宗': 'ZONG', '总': 'ZONG', '纵': 'ZONG', '走': 'ZOU', '奏': 'ZOU', '租': 'ZU', '足': 'ZU', '族': 'ZU', '阻': 'ZU', '组': 'ZU', '祖': 'ZU', '钻': 'ZUAN', '嘴': 'ZUI', '最': 'ZUI', '罪': 'ZUI', '尊': 'ZUN', '遵': 'ZUN', '左': 'ZUO', '作': 'ZUO', '做': 'ZUO', '坐': 'ZUO', '座': 'ZUO',
+        '西': 'XI', '希': 'XI', '息': 'XI', '习': 'XI', '洗': 'XI', '系': 'XI', '细': 'XI', '下': 'XIA', '夏': 'XIA', '厦': 'XIA', '仙': 'XIAN', '先': 'XIAN', '鲜': 'XIAN', '县': 'XIAN', '现': 'XIAN', '线': 'XIAN', '限': 'XIAN', '相': 'XIANG', '香': 'XIANG', '想': 'XIANG', '向': 'XIANG', '象': 'XIANG', '像': 'XIANG', '项': 'XIANG', '小': 'XIAO', '校': 'XIAO', '笑': 'XIAO', '效': 'XIAO', '些': 'XIE', '写': 'XIE', '谢': 'XIE', '新': 'XIN', '心': 'XIN', '信': 'XIN', '兴': 'XING', '星': 'XING', '行': 'XING', '形': 'XING', '醒': 'XING', '姓': 'XING', '凶': 'XIONG', '兄': 'XIONG', '熊': 'XIONG', '休': 'XIU', '修': 'XIU', '秀': 'XIU', '需': 'XU', '须': 'XU', '徐': 'XU', '许': 'XU', '序': 'XU', '血': 'XUE', '雪': 'XUE', '学': 'XUE', '讯': 'XUN', '训': 'XUN', '迅': 'XUN', '压': 'YA', '呀': 'YA', '牙': 'YA', '亚': 'YA', '研': 'YAN', '言': 'YAN', '严': 'YAN', '沿': 'YAN', '眼': 'YAN', '演': 'YAN', '阳': 'YANG', '扬': 'YANG', '羊': 'YANG', '洋': 'YANG', '养': 'YANG', '样': 'YANG', '腰': 'YAO', '摇': 'YAO', '药': 'YAO', '要': 'YAO', '野': 'YE', '业': 'YE', '夜': 'YE', '叶': 'YE', '页': 'YE', '一': 'YI', '医': 'YI', '衣': 'YI', '以': 'YI', '已': 'YI', '艺': 'YI', '易': 'YI', '意': 'YI', '义': 'YI', '因': 'YIN', '引': 'YIN', '银': 'YIN', '印': 'YIN', '英': 'YING', '影': 'YING', '应': 'YING', '用': 'YONG', '永': 'YONG', '泳': 'YONG', '勇': 'YONG', '涌': 'YONG', '你': 'NI', '有': 'YOU', '由': 'YOU', '友': 'YOU', '右': 'YOU', '又': 'YOU', '幼': 'YOU', '鱼': 'YU', '于': 'YU', '余': 'YU', '雨': 'YU', '与': 'YU', '宇': 'YU', '语': 'YU', '玉': 'YU', '育': 'YU', '预': 'YU', '域': 'YU', '元': 'YUAN', '原': 'YUAN', '园': 'YUAN', '圆': 'YUAN', '远': 'YUAN', '院': 'YUAN', '愿': 'YUAN', '月': 'YUE', '越': 'YUE', '云': 'YUN', '运': 'YUN', '孕': 'YUN', '再': 'ZAI', '在': 'ZAI', '咱': 'ZAN', '暂': 'ZAN', '赞': 'ZAN', '脏': 'ZANG', '葬': 'ZANG', '早': 'ZAO', '枣': 'ZAO', '怎': 'ZEN', '增': 'ZENG', '扎': 'ZHA', '眨': 'ZHA', '炸': 'ZHA', '栅': 'ZHA', '占': 'ZHAN', '战': 'ZHAN', '站': 'ZHAN', '张': 'ZHANG', '掌': 'ZHANG', '丈': 'ZHANG', '仗': 'ZHANG', '账': 'ZHANG', '障': 'ZHANG', '招': 'ZHAO', '找': 'ZHAO', '照': 'ZHAO', '罩': 'ZHAO', '赵': 'ZHAO', '折': 'ZHE', '这': 'ZHE', '浙': 'ZHE', '针': 'ZHEN', '真': 'ZHEN', '诊': 'ZHEN', '镇': 'ZHEN', '阵': 'ZHEN', '正': 'ZHENG', '政': 'ZHENG', '证': 'ZHENG', '郑': 'ZHENG', '只': 'ZHI', '知': 'ZHI', '之': 'ZHI', '支': 'ZHI', '直': 'ZHI', '职': 'ZHI', '植': 'ZHI', '值': 'ZHI', '至': 'ZHI', '治': 'ZHI', '志': 'ZHI', '制': 'ZHI', '质': 'ZHI', '致': 'ZHI', '中': 'ZHONG', '忠': 'ZHONG', '钟': 'ZHONG', '终': 'ZHONG', '种': 'ZHONG', '重': 'ZHONG', '州': 'ZHOU', '周': 'ZHOU', '洲': 'ZHOU', '粥': 'ZHOU', '竹': 'ZHU', '主': 'ZHU', '住': 'ZHU', '注': 'ZHU', '驻': 'ZHU', '柱': 'ZHU', '祝': 'ZHU', '著': 'ZHU', '抓': 'ZHU', '专': 'ZHUAN', '转': 'ZHUAN', '装': 'ZHUANG', '庄': 'ZHUANG', '壮': 'ZHUANG', '撞': 'ZHUANG', '追': 'ZHUI', '准': 'ZHUN', '卓': 'ZHUO', '桌': 'ZHUO', '捉': 'ZHUO', '浊': 'ZHUO', '资': 'ZI', '子': 'ZI', '自': 'ZI', '字': 'ZI', '紫': 'ZI', '宗': 'ZONG', '总': 'ZONG', '纵': 'ZONG', '走': 'ZOU', '奏': 'ZOU', '租': 'ZU', '足': 'ZU', '族': 'ZU', '阻': 'ZU', '组': 'ZU', '祖': 'ZU', '钻': 'ZUAN', '嘴': 'ZUI', '最': 'ZUI', '罪': 'ZUI', '尊': 'ZUN', '遵': 'ZUN', '左': 'ZUO', '作': 'ZUO', '做': 'ZUO', '坐': 'ZUO', '座': 'ZUO',
         '·': '·'
     };
 
@@ -443,15 +515,31 @@
     // 更新姓名拼音字段（优先使用后端API，失败则用本地映射表）
     var pinyinController = null;  // 用于取消上次请求的 AbortController
     function updatePinyinField(nameField, pinyinTargetId) {
+        console.log('[拼音] updatePinyinField called', {pinyinTargetId: pinyinTargetId, nameValue: nameField.value});
         var pinyinField = document.getElementById(pinyinTargetId);
+        console.log('[拼音] 通过ID获取字段:', pinyinField ? '成功' : '失败');
         // 备选：如果找不到指定ID，查找name_pinyin类型的字段
         if (!pinyinField) {
             pinyinField = document.querySelector('input[name$="_pinyin"], input[name="name_pinyin"]');
+            console.log('[拼音] 备选查询结果:', pinyinField ? '成功' : '失败');
+        }
+        if (!pinyinField) {
+            console.log('[拼音] 错误：找不到拼音字段，pinyinTargetId=', pinyinTargetId);
+            console.log('[拼音] DOM中所有input元素:', Array.from(document.querySelectorAll('input')).map(i => i.id + '(' + i.name + ')').join(', '));
         }
         if (!pinyinField || !nameField) return;
 
         var name = nameField.value.trim();
+        // 验证中文姓名必须≥2个汉字
+        var chineseChars = name.match(/[\u4e00-\u9fa5]/g);
+        var chineseCount = chineseChars ? chineseChars.length : 0;
+        
         if (!name) {
+            pinyinField.value = '';
+            return;
+        }
+        
+        if (chineseCount < 2) {
             pinyinField.value = '';
             return;
         }
@@ -463,35 +551,163 @@
         pinyinController = new AbortController();
 
         // 调用后端API获取拼音
-        fetch('/employee/api/pinyin/?name=' + encodeURIComponent(name), { signal: pinyinController.signal })
-            .then(function(response) { return response.json(); })
+        var apiUrl = '/api/pinyin/?name=' + encodeURIComponent(name) + '&t=' + Date.now();
+        console.log('[拼音] 调用API:', apiUrl);
+        
+        fetch(apiUrl, { signal: pinyinController.signal })
+            .then(function(response) {
+                console.log('[拼音] API响应状态:', response.status);
+                if (!response.ok) {
+                    throw new Error('API响应错误: ' + response.status);
+                }
+                return response.json();
+            })
             .then(function(data) {
-                if (data.success && data.pinyin) {
+                console.log('[拼音] API返回数据:', JSON.stringify(data));
+                if (data && data.pinyin) {
                     pinyinField.value = data.pinyin;
+                    console.log('[拼音] 通过API设置拼音:', data.pinyin);
                 } else {
-                    // API失败时使用本地映射表
-                    pinyinField.value = chineseToPinyin(name);
+                    // API返回格式不正确时使用本地映射表
+                    var localResult = chineseToPinyin(name);
+                    console.log('[拼音] API返回格式不正确，使用本地映射:', localResult);
+                    pinyinField.value = localResult;
                 }
             })
             .catch(function(err) {
                 // 如果是取消的请求，不做处理
-                if (err.name === 'AbortError') return;
+                if (err.name === 'AbortError') {
+                    console.log('[拼音] 请求被取消');
+                    return;
+                }
+                console.log('[拼音] API出错:', err.message);
                 // 出错时使用本地映射表
-                pinyinField.value = chineseToPinyin(name);
+                var localResult = chineseToPinyin(name);
+                console.log('[拼音] API异常，使用本地映射:', localResult);
+                pinyinField.value = localResult;
             });
     }
 
-    // 姓名校验（1-15个汉字）
+    // 姓名校验：支持少数民族间隔符·，规则如下
+    // 1. 纯汉字：2-15个汉字
+    // 2. 有·：·只能出现一次，·前后必须是汉字，·前至少2汉字，·后至少2汉字，总汉字2-15
     function validateName(input) {
         var value = input.value.trim();
+        // 查找 invalid-feedback 元素
         var feedback = input.nextElementSibling;
-        if (value && !/^[\u4e00-\u9fff·]{1,15}$/.test(value)) {
+        if (!feedback || !feedback.classList.contains('invalid-feedback')) {
+            feedback = input.parentElement.querySelector('.invalid-feedback');
+        }// 非空检查
+        if (!value) {
+            return true;
+        }
+        
+        // 检查是否只包含汉字和·（可选的间隔符）
+        if (!/^[\u4e00-\u9fa5·]+$/.test(value)) {
             input.classList.add('is-invalid');
-            if (feedback && feedback.classList.contains('invalid-feedback')) {
-                feedback.textContent = '姓名须为1～15个汉字，可包含少数民族用间隔符"·"';
+            if (feedback) {
+                feedback.textContent = '姓名只能包含汉字，可选间隔符·';
                 feedback.classList.add('d-block');
             }
             return false;
+        }
+        
+        // 检查·的使用
+        if (value.includes('·')) {
+            // 统计·的数量（只能有1个）
+            var dotCount = (value.match(/·/g) || []).length;
+            if (dotCount > 1) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '间隔符·只能使用一次';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+            
+            // 检查·前后是否是汉字
+            var dotIndex = value.indexOf('·');
+            var beforeDot = value.substring(0, dotIndex);
+            var afterDot = value.substring(dotIndex + 1);
+            
+            // ·前必须是连续汉字
+            if (!/^[\u4e00-\u9fa5]+$/.test(beforeDot)) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '间隔符·前必须是汉字';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+            
+            // ·后必须是连续汉字
+            if (!/^[\u4e00-\u9fa5]+$/.test(afterDot)) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '间隔符·后必须是汉字';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+            
+            // ·前至少2个汉字
+            if (beforeDot.length < 2) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '间隔符·前至少2个汉字';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+            
+            // ·后至少2个汉字
+            if (afterDot.length < 2) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '间隔符·后至少2个汉字';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+            
+            // 总汉字数不超过15
+            var totalChinese = beforeDot.length + afterDot.length;
+            if (totalChinese > 15) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '姓名总汉字数不超过15个';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+        } else {
+            // 纯汉字：2-15个
+            var chineseChars = value.match(/[\u4e00-\u9fa5]/g);
+            var chineseCount = chineseChars ? chineseChars.length : 0;
+            
+            if (chineseCount < 2) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '中文姓名须至少包含2个汉字';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+            
+            if (chineseCount > 15) {
+                input.classList.add('is-invalid');
+                if (feedback) {
+                    feedback.textContent = '姓名须为2～15个汉字';
+                    feedback.classList.add('d-block');
+                }
+                return false;
+            }
+        }
+        
+        // 校验通过，清除错误状态
+        input.classList.remove('is-invalid');
+        if (feedback) {
+            feedback.classList.remove('d-block');
         }
         return true;
     }
@@ -518,7 +734,7 @@
             return;
         }
 
-        // 从身份证号解析出生日期 (7-14位)
+        // 从身份证号解析出生日期 (7-14位)，格式改为 YYYY-MM-DD 匹配后端期望
         var birthYear = value.substring(6, 10);
         var birthMonth = value.substring(10, 12);
         var birthDay = value.substring(12, 14);
@@ -528,13 +744,14 @@
         var genderCode = parseInt(value.charAt(16));
         var gender = genderCode % 2 === 1 ? '男' : '女';
 
-        // 通过 data 属性查找出生日期字段并填充
+        // 通过 data 属性查找出生日期字段并填充（始终覆盖，保证身份证改后同步更新）
         var birthDateField = document.querySelector('input[data-is-birthdate="true"]');
         if (birthDateField) {
-            if (!birthDateField.value || birthDateField.dataset.autoFilled === 'true') {
-                birthDateField.value = birthDate;
-                birthDateField.dataset.autoFilled = 'true';
-            }
+            birthDateField.value = birthDate;
+            birthDateField.readOnly = true;
+            birthDateField.style.cursor = 'not-allowed';
+            birthDateField.style.opacity = '0.8';
+            clearInvalid(birthDateField); // 自动填充后清除红框
         }
 
         // 通过 data 属性查找性别字段并填充（如果是下拉框）
@@ -543,6 +760,7 @@
             if (!genderField.value || genderField.dataset.autoFilled === 'true') {
                 genderField.value = gender;
                 genderField.dataset.autoFilled = 'true';
+                clearInvalid(genderField); // 自动填充后清除红框
             }
         }
     }
@@ -575,15 +793,31 @@
     }
 
     // 校验身份证有效期
-    function validateIdCardExpiry(expiryDateValue) {
+    function validateIdCardExpiry(expiryDateValue, idCardValue) {
         if (!expiryDateValue) {
             return { valid: true };
         }
 
         var today = new Date();
+        var todayStr = today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0');
         var expiryDateStr = expiryDateValue.replace(/-/g, '');
 
-        if (expiryDateStr < (today.getFullYear() + String(today.getMonth() + 1).padStart(2, '0') + String(today.getDate()).padStart(2, '0'))) {
+        // 年龄≥46时，允许有效期为"长期"（20991231）
+        if (expiryDateStr === '20991231' && idCardValue) {
+            var birthYear = parseInt(idCardValue.substring(6, 10));
+            var birthMonth = parseInt(idCardValue.substring(10, 12));
+            var birthDay = parseInt(idCardValue.substring(12, 14));
+            var age = today.getFullYear() - birthYear;
+            if (today.getMonth() < birthMonth || (today.getMonth() === birthMonth && today.getDate() < birthDay)) {
+                age--;
+            }
+            if (age >= 46) {
+                return { valid: true };
+            }
+            return { valid: false, message: '仅限46周岁及以上申请人填写"长期"作为有效期' };
+        }
+
+        if (expiryDateStr < todayStr) {
             return { valid: false, message: '身份证已过期，不可申请信用卡' };
         }
 
@@ -626,6 +860,76 @@
 
     // 表单提交时的完整校验
     function validateFormOnSubmit(form) {
+        // 清除已确认标记：防止后端校验失败重渲染后，data-post-confirmed 标记残留导致直接放行
+        if (form.getAttribute('data-post-confirmed') === '1') {
+            form.removeAttribute('data-post-confirmed');
+        }
+
+        // ===== 必填字段通用校验 =====
+        var requiredFields = form.querySelectorAll('[required]');
+        var firstEmpty = null;
+        for (var i = 0; i < requiredFields.length; i++) {
+            var f = requiredFields[i];
+            var val = f.value ? f.value.trim() : '';
+            if (!val) {
+                f.classList.add('is-invalid');
+                // 查找 invalid-feedback 元素（可能紧邻，也可能中间有其他元素）
+                var fb = f.nextElementSibling;
+                if (!fb || !fb.classList.contains('invalid-feedback')) {
+                    fb = f.parentElement.querySelector('.invalid-feedback');
+                }
+                if (fb && fb.classList.contains('invalid-feedback')) {
+                    // 动态获取字段名，设置错误文本
+                    var fieldId = f.id || f.getAttribute('name');
+                    var label = fieldId ? document.querySelector('label[for="' + fieldId + '"]') : null;
+                    var fieldLabel = label ? label.textContent.replace(/[*""]/g, '').trim() : fieldId;
+                    fb.textContent = '"' + fieldLabel + '"为必填项';
+                    fb.classList.add('d-block');
+                }
+                if (!firstEmpty) firstEmpty = f;
+            }
+        }
+        if (firstEmpty) {
+            firstEmpty.focus();
+            return false;
+        }
+
+        // 校验所有姓名字段（≥2个汉字）- 使用 data-pinyin-target 属性选择
+        var nameFields = document.querySelectorAll('input[data-pinyin-target]');
+        for (var i = 0; i < nameFields.length; i++) {
+            if (!validateName(nameFields[i])) {
+                nameFields[i].focus();
+                return false;
+            }
+        }
+
+        // ===== 格式字段重扫：身份证号 =====
+        var idCardInputs = document.querySelectorAll('input[data-is-idcard="true"]');
+        for (var i = 0; i < idCardInputs.length; i++) {
+            if (!validateIdCard(idCardInputs[i])) {
+                idCardInputs[i].focus();
+                return false;
+            }
+        }
+
+        // ===== 格式字段重扫：手机号 =====
+        var phoneInputs = document.querySelectorAll('input[data-is-phone="true"]');
+        for (var i = 0; i < phoneInputs.length; i++) {
+            if (!validatePhone(phoneInputs[i])) {
+                phoneInputs[i].focus();
+                return false;
+            }
+        }
+
+        // ===== 格式字段重扫：金额 =====
+        var amountInputs = document.querySelectorAll('input[data-is-amount="true"]');
+        for (var i = 0; i < amountInputs.length; i++) {
+            if (!validateAmount(amountInputs[i])) {
+                amountInputs[i].focus();
+                return false;
+            }
+        }
+
         // 通过 data 属性获取身份证号
         var idCardInput = document.querySelector('input[data-is-idcard="true"]');
         var idCardValue = idCardInput ? idCardInput.value.trim() : '';
@@ -657,16 +961,24 @@
             }
         }
 
-        // 校验身份证有效期
+        // 校验身份证有效期（传入身份证号，用于判断年龄≥46时是否允许20991231）
         var expiryInput = document.querySelector('input[data-is-idcard-expiry="true"]');
         if (expiryInput) {
             var expiryValue = expiryInput.value.trim();
-            var expiryResult = validateIdCardExpiry(expiryValue);
+            var expiryResult = validateIdCardExpiry(expiryValue, idCardValue);
             if (!expiryResult.valid) {
                 alert(expiryResult.message);
                 expiryInput.focus();
                 return false;
             }
+        }
+
+        // 校验全部通过，设置弹窗姓名内容（使用申请人姓名字段）
+        var confirmBody = document.getElementById('postSubmitConfirmBody');
+        if (confirmBody) {
+            var applicantNameField = document.getElementById('applicant_name');
+            var nameValue = applicantNameField ? applicantNameField.value.trim() : '';
+            confirmBody.textContent = nameValue ? '确定要提交"' + nameValue + '"的申请吗？' : '确定要提交吗？';
         }
 
         return true;
@@ -707,7 +1019,10 @@
         if (input.classList.contains('is-invalid')) {
             input.classList.remove('is-invalid');
             var feedback = input.nextElementSibling;
-            if (feedback && feedback.classList.contains('invalid-feedback')) {
+            if (!feedback || !feedback.classList.contains('invalid-feedback')) {
+                feedback = input.parentElement.querySelector('.invalid-feedback');
+            }
+            if (feedback) {
                 feedback.classList.remove('d-block');
             }
         }
@@ -730,16 +1045,20 @@
 
     // 姓名字段验证
     document.querySelectorAll('input[type="text"]').forEach(function(input) {
+        console.log('[拼音] 检查 input:', {name: input.name, id: input.id, pinyinTarget: input.getAttribute('data-pinyin-target')});
         var nameRegex = /[\u4e00-\u9fff·]/;
         // 检查是否是姓名字段（通过placeholder或validation_rule判断）
         {% for field in current_page.fields %}
         {% if field.field_type == 'name' or field.validation_rule == 'name' %}
         if (input.name === '{{ field.field_key }}') {
+            console.log('[拼音] 绑定姓名字段事件:', '{{ field.field_key }}');
             input.addEventListener('blur', function() { validateName(this); });
             input.addEventListener('input', function() { clearInvalid(this); });
-            // 姓名拼音自动更新
-            var pinyinTargetId = '{{ field.field_key }}_pinyin';
+            // 姓名拼音自动更新（从data-pinyin-target属性读取）
+            var pinyinTargetId = input.getAttribute('data-pinyin-target');
+            console.log('[拼音] pinyinTargetId:', pinyinTargetId);
             input.addEventListener('input', function() { updatePinyinField(this, pinyinTargetId); });
+            input.addEventListener('blur', function() { updatePinyinField(this, pinyinTargetId); });
             // 初始化（如果姓名字段已有值）
             if (input.value) {
                 updatePinyinField(input, pinyinTargetId);
@@ -792,6 +1111,28 @@
         {% endif %}
         {% endfor %}
     });
+
+    // ===== 全局清除红框：所有 input/textarea/select 一输入就清除错误状态 =====
+    (function() {
+        var form = document.getElementById('stepForm');
+        if (!form) return;
+        form.addEventListener('input', function(e) {
+            var target = e.target;
+            if (target.classList.contains('form-control') ||
+                target.tagName === 'SELECT' ||
+                target.tagName === 'TEXTAREA') {
+                clearInvalid(target);
+            }
+        });
+        form.addEventListener('change', function(e) {
+            var target = e.target;
+            if (target.classList.contains('form-control') ||
+                target.tagName === 'SELECT' ||
+                target.tagName === 'TEXTAREA') {
+                clearInvalid(target);
+            }
+        });
+    })();
 
     // 图片选择处理：将图片转为 base64 并存储
     function handleImageSelect(input, previewContainerId, base64InputId) {

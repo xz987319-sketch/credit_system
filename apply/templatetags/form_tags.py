@@ -70,8 +70,8 @@ CORE_FIELD_KEYS = {
 # 核心字段默认标签
 CORE_FIELD_DEFAULT_LABELS = {
     'applicant_name': '申请人姓名',
-    'id_card': '身份证号',
-    'phone': '手机号码',
+    'id_card': '证件号码',
+    'phone': '手机号',
     'amount': '申请金额（元）',
     'card_product': '申请卡种',
     'supplementary_note': '补充说明',

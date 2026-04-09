@@ -340,6 +340,130 @@ def employee_apply_view(request):  # 定义员工申请视图函数
     )
 
 
+def _validate_page_for_return_edit(page_fields, post_data, existing_form_data, product=None):
+    """
+    退回编辑模式下的页面校验。
+    - 跳过图片字段的必填校验（已有图片保留）
+    - 跳过银行专用栏的必填校验
+    - 对其他字段进行正常校验
+    返回错误字典。
+    """
+    errors = {}
+    
+    for field in page_fields:
+        field_key = field.field_key
+        
+        # 跳过姓名拼音（自动生成）
+        if field.field_type == 'name_pinyin':
+            continue
+        
+        # 图片字段：检查 base64 数据或已有图片
+        if field.field_type == 'image':
+            # 检查是否有新的 base64 数据或已有图片
+            base64_value = post_data.get(field_key + '_base64', '')
+            if isinstance(base64_value, list):
+                base64_value = base64_value[0] if base64_value else ''
+            
+            # 检查是否已有图片（退回编辑模式下保留）
+            existing_value = existing_form_data.get(field_key)
+            has_value = bool(base64_value and base64_value.strip()) or bool(existing_value and existing_value.strip())
+            
+            # 退回编辑模式下不强制要求必填（因为保留原图片）
+            if field.is_required and not has_value:
+                errors[field_key] = f'{field.field_label}为必填项'
+            continue
+        
+        # 只对真正只读的 bank_code 字段跳过必填校验（由系统自动填充，用户无法编辑）
+        # 其他银行专用栏字段（如 BA_POST、BNK_REF_NAME 等）如果 is_readonly=False，用户可以编辑，仍需校验必填
+        if field_key == 'bank_code':
+            # 跳过必填校验（bank_code 由系统自动填充，前端也是 readonly）
+            continue
+        
+        # 其他字段 - 统一处理成字符串
+        field_value = post_data.get(field_key)
+        if isinstance(field_value, list):
+            first_val = next((v for v in field_value if v), None)
+            field_value = first_val.strip() if first_val else ''
+        elif field_value is None:
+            field_value = ''
+        else:
+            field_value = str(field_value).strip()
+        
+        # 必填校验
+        if field.is_required and not field_value:
+            errors[field_key] = f'{field.field_label}为必填项'
+            continue
+        
+        if not field_value:
+            continue
+        
+        # 格式校验
+        str_value = field_value
+        
+        # 长度校验
+        if field.max_length and len(str_value) > field.max_length:
+            errors[field_key] = f'{field.field_label}不能超过{field.max_length}个字符'
+            continue
+        
+        # 根据 field_type 进行格式校验
+        if field.field_type == 'phone' or field.validation_rule == 'phone':
+            try:
+                from apply.utils.applicant_validate import clean_cn_mobile
+                clean_cn_mobile(str_value)
+            except Exception as e:
+                errors[field_key] = str(e)
+        elif field.field_type == 'id_card':
+            try:
+                from apply.utils.applicant_validate import clean_id_card_18
+                clean_id_card_18(str_value)
+            except Exception as e:
+                errors[field_key] = str(e)
+        elif field.field_type == 'name' or field.validation_rule == 'name':
+            # 姓名格式校验：至少2个汉字，最多15个汉字，少数民族·后需≥2个汉字，只能输入汉字
+            chinese_chars = str_value.replace('·', '')
+            chinese_count = len([c for c in chinese_chars if '\u4e00' <= c <= '\u9fff'])
+            dot_parts = str_value.split('·')
+            for i in range(1, len(dot_parts)):
+                part_chinese = [c for c in dot_parts[i] if '\u4e00' <= c <= '\u9fff']
+                if len(part_chinese) < 2:
+                    errors[field_key] = '间隔符"·"后至少需要2个汉字'
+                    break
+            else:
+                if chinese_count < 2:
+                    errors[field_key] = '姓名须至少包含2个汉字'
+                elif chinese_count > 15:
+                    errors[field_key] = '姓名不能超过15个汉字'
+                elif not all('\u4e00' <= c <= '\u9fff' or c == '·' for c in str_value):
+                    errors[field_key] = '姓名只能输入汉字'
+        elif field.field_type == 'amount' or field.validation_rule == 'amount_range':
+            try:
+                amount_str = str_value.replace(',', '').strip()
+                Decimal(amount_str)
+                if product:
+                    amount = Decimal(amount_str)
+                    lo, hi = product.credit_limit_min, product.credit_limit_max
+                    if amount < lo or amount > hi:
+                        errors[field_key] = f'申请金额必须在{lo:,.2f}～{hi:,.2f}元之间'
+            except Exception:
+                errors[field_key] = '请输入有效的金额数字'
+        elif field.field_type == 'number' and not field.validation_rule:
+            try:
+                float(str_value)
+            except (ValueError, TypeError):
+                errors[field_key] = f'{field.field_label}必须为有效数字'
+        elif field.field_type == 'date':
+            import datetime
+            try:
+                if len(str_value) == 8:
+                    datetime.datetime.strptime(str_value, '%Y%m%d')
+                else:
+                    datetime.datetime.strptime(str_value, '%Y-%m-%d')
+            except (ValueError, TypeError):
+                errors[field_key] = f'{field.field_label}日期格式不正确'
+    
+    return errors
+
+
 @login_required  # 编辑需登录
 @require_http_methods(["GET", "POST"])  # 允许 GET 展示 POST 保存
 def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
@@ -352,6 +476,9 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
         messages.warning(request, "当前状态不可补充资料")  # 提示状态不符
         return redirect("apply:my_applications")  # 返回列表
     if request.method == "POST":  # 处理保存提交
+        print(f"[DEBUG return_edit] ===== POST 请求开始 =====")
+        print(f"[DEBUG return_edit] pk={pk}, application.status={application.status}")
+        
         # ========== 动态表单字段后端校验 ==========
         from apply.models.form_config import FormPage, FormField
         from apply.views.multi_step_form import _validate_step_data
@@ -359,14 +486,61 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
         # 获取所有动态字段配置（用于校验）
         form_pages_config = FormPage.objects.filter(is_active=True).prefetch_related('fields').order_by('order')
         
+        # 获取第一页（基本信息页），退回编辑模式下跳过其必填校验
+        first_page = form_pages_config.first()
+        
+        # 初始化 form_data（用于校验函数检查已有图片等）
+        form_data = dict(application.form_data or {})
+        
         all_errors = {}
         for page in form_pages_config:
             # 收集当前页的所有字段用于校验
             page_fields = list(page.fields.filter(is_active=True).order_by('sort_order'))
             if page_fields:
-                is_valid, step_errors = _validate_step_data(page_fields, request.POST, product=application.card_product)
-                if not is_valid:
-                    all_errors.update(step_errors)
+                print(f"[DEBUG return_edit] 校验页面: {page.page_title}, 字段数: {len(page_fields)}")
+                
+                # 判断是否为第一页（基本信息页）- 退回编辑模式下跳过必填校验
+                is_basic_page = (page.pk == first_page.pk) if first_page else False
+                
+                # 对第一页的字段进行校验，但跳过必填校验（因为是只读字段）
+                if is_basic_page:
+                    # 只校验格式，不校验必填
+                    for field in page_fields:
+                        field_key = field.field_key
+                        field_value = request.POST.get(field_key, '').strip()
+                        
+                        # 跳过核心字段和姓名拼音
+                        if field_key in {'applicant_name', 'id_card', 'phone', 'amount', 'card_product', 'supplementary_note', 'return_reason', 'applicant_name_pinyin'}:
+                            continue
+                        if field.field_type == 'name_pinyin':
+                            continue
+                        
+                        # 只读字段不校验必填
+                        if field_value:
+                            # 有值时进行格式校验
+                            if field.field_type == 'phone':
+                                try:
+                                    from django.core.validators import validate_slug
+                                    from apply.utils.validators import clean_cn_mobile
+                                    clean_cn_mobile(field_value)
+                                except Exception as e:
+                                    all_errors[field_key] = str(e)
+                            elif field.field_type == 'id_card':
+                                try:
+                                    from apply.utils.validators import clean_id_card_18
+                                    clean_id_card_18(field_value)
+                                except Exception as e:
+                                    all_errors[field_key] = str(e)
+                else:
+                    # 非第一页正常校验，但退回编辑模式下跳过图片和银行栏的必填校验
+                    page_errors = _validate_page_for_return_edit(page_fields, request.POST, form_data, product=application.card_product)
+                    if page_errors:
+                        all_errors.update(page_errors)
+                        print(f"[DEBUG return_edit] 页面 {page.page_title} 校验失败: {page_errors}")
+                    else:
+                        print(f"[DEBUG return_edit] 页面 {page.page_title} 校验通过")
+        
+        print(f"[DEBUG return_edit] 所有校验错误: {all_errors}")
         
         # 如果有校验错误，返回表单并显示错误
         if all_errors:
@@ -404,6 +578,7 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
         
         form = ReturnEditForm(request.POST, instance=application)  # 绑定实例
         if form.is_valid():  # 校验表单
+            print(f"[DEBUG return_edit] ReturnEditForm 校验通过")
             obj = form.save(commit=False)  # 生成待保存对象
 
             # 保存动态字段到 form_data
@@ -452,10 +627,15 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
             obj.form_data = dynamic_data
             obj.status = Application.ST_PENDING_FIRST  # 重置为待初审
             obj.return_reason = ""  # 清空退回原因
+            print(f"[DEBUG return_edit] 保存前 - application.status={application.status}, form_data keys={list(dynamic_data.keys())}")
             obj.save()  # 持久化修改
+            print(f"[DEBUG return_edit] 保存后 - application.status={application.status}")
             messages.success(request, "资料已更新并重新进入初审队列")  # 成功提示
-            return redirect("apply:my_applications")  # 回到列表
+            result = redirect("apply:my_applications")
+            print(f"[DEBUG return_edit] ===== 完成，返回 redirect =====")
+            return result
         else:
+            print(f"[DEBUG return_edit] ReturnEditForm 校验失败: {form.errors}")
             # 表单验证失败，保留用户输入的动态字段值
             form_data = dict(application.form_data or {})
             from apply.models.form_config import FormPage
@@ -579,12 +759,18 @@ def return_multi_step_view(request, pk: int):
 
     # 处理POST请求
     if request.method == "POST":
+        print(f"[DEBUG] ===== POST 请求开始 =====")
+        print(f"[DEBUG] pk={pk}, step={request.POST.get('step')}, is_last={request.POST.get('is_last')}")
+        
         step = int(request.POST.get('step', 0))
         is_last = request.POST.get('is_last', 'false').lower() == 'true'
         is_prev = request.POST.get('prev_step') == '1'
 
+        print(f"[DEBUG] step={step}, is_last={is_last}, is_prev={is_prev}, total_pages={len(form_pages)}")
+        
         current_page = form_pages[step]
         page_fields = current_page['fields']
+        print(f"[DEBUG] 当前页: {current_page['page'].page_title}, 字段数: {len(page_fields)}")
 
         # 获取当前页数据
         page_data = {}
@@ -619,6 +805,7 @@ def return_multi_step_view(request, pk: int):
 
         # 校验当前页数据
         is_valid, errors = _validate_step_data(page_fields, request.POST, product=product)
+        print(f"[DEBUG] 校验结果: is_valid={is_valid}, errors={errors}")
 
         if errors:
             existing_form_data.update(page_data)
@@ -637,8 +824,12 @@ def return_multi_step_view(request, pk: int):
 
         # 如果是最后一步，保存
         if is_last:
-            return _save_return_application(request, existing_form_data, product, application)
+            print(f"[DEBUG] 最后一步，准备保存数据，form_data keys: {list(existing_form_data.keys())}")
+            result = _save_return_application(request, existing_form_data, product, application)
+            print(f"[DEBUG] 保存完成，返回: {result}")
+            return result
         else:
+            print(f"[DEBUG] 跳转到下一步: step={step + 1}")
             return redirect(f'{request.path}?step={step + 1}')
 
     # GET请求 - 显示指定步骤的表单
@@ -679,6 +870,10 @@ def _save_return_application(request, form_data, product, application):
     保存退回编辑后的申请。
     核心字段更新到 Application，动态字段合并到 form_data。
     """
+    print(f"[DEBUG] ===== _save_return_application 开始 =====")
+    print(f"[DEBUG] application.id={application.pk}, product={product}")
+    print(f"[DEBUG] form_data keys: {list(form_data.keys())}")
+    
     from apply.models import Application
 
     # 【安全加固】强制用 product.bank.bank_code
@@ -688,7 +883,9 @@ def _save_return_application(request, form_data, product, application):
     applicant_name = form_data.get('applicant_name', application.applicant_name)
     id_card = form_data.get('id_card', application.id_card)
     phone = form_data.get('phone', application.phone)
-    amount_str = form_data.get('AMOUNT', str(application.amount))
+    # 兼容旧数据：form_data 中可能用 'AMOUNT'（大写）或 'amount'（小写）
+    # 优先使用 AMOUNT（大写），因为原始申请数据都用大写
+    amount_str = form_data.get('AMOUNT') or form_data.get('amount') or str(application.amount)
 
     # 处理金额
     try:
@@ -730,10 +927,14 @@ def _save_return_application(request, form_data, product, application):
     application.status = Application.ST_PENDING_FIRST
     application.return_reason = ""
 
+    print(f"[DEBUG] 保存前 - application.status={application.status}")
     application.save()
+    print(f"[DEBUG] 保存后 - application.status={application.status}")
 
     messages.success(request, "资料已更新并重新进入初审队列")
-    return redirect("apply:my_applications")
+    result = redirect("apply:my_applications")
+    print(f"[DEBUG] ===== _save_return_application 完成，返回 redirect =====")
+    return result
 
 
 def _build_issue_compare(application: Application) -> list[dict]:  # 定义私有函数生成比对行

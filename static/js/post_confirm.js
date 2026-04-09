@@ -32,12 +32,24 @@
       if (!form || form.tagName !== "FORM" || form.method.toLowerCase() !== "post") {
         return; // 非 POST 表单不处理
       }
+      // 获取触发提交的按钮
+      const submittedBtn = e.submitter;
+      // 如果有确认标记，说明是弹窗确认后的二次提交，放行
       if (form.getAttribute("data-post-confirmed") === "1") {
         form.removeAttribute("data-post-confirmed"); // 清除标记以便下次仍可确认
         return; // 放行真实提交
       }
-      if (form.classList.contains("no-post-confirm")) {
-        return; // 显式声明不需要二次确认
+      // 只有按钮有 post-confirm 类才弹窗
+      if (!submittedBtn || !submittedBtn.classList.contains("post-confirm")) {
+        return; // 没有 post-confirm 类，跳过
+      }
+      // 【前置必填校验】：调用表单的 validateFormOnSubmit 进行完整校验
+      // 如果校验函数存在且返回 false，说明校验失败，阻止弹窗
+      if (typeof validateFormOnSubmit === "function") {
+        if (!validateFormOnSubmit(form)) {
+          e.preventDefault(); // 阻止提交
+          return;
+        }
       }
       e.preventDefault(); // 阻止首次直接提交
       e.stopPropagation(); // 避免冒泡触发其它逻辑

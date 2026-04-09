@@ -101,13 +101,23 @@
             margin-top: 5px;
         }
 
-        /* 固定底部按钮 */
+        /* 固定底部按钮 - 适配移动端软键盘 */
+        .step-form-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100dvh;
+            padding-bottom: 80px; /* 为底部按钮留出空间 */
+        }
+        .form-card {
+            flex: 1; /* 表单卡片占据剩余空间 */
+        }
         .fixed-bottom-btn {
-            position: fixed;
+            position: sticky;
             bottom: 0;
-            left: 0;
-            right: 0;
+            flex-shrink: 0;
+            z-index: 1050;
             padding: 15px;
+            padding-bottom: max(15px, env(safe-area-inset-bottom)); /* 适配iPhone刘海屏 */
             background: #fff;
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
         }
@@ -144,6 +154,7 @@
             <!-- 隐藏字段 -->
             <input type="hidden" name="step" value="{{ current_step }}">
             <input type="hidden" name="is_last" value="{{ is_last|yesno:'true,false' }}">
+            <input type="hidden" name="_form_token" value="{{ form_token }}">
 
             <!-- 进度条 -->
             <div class="step-progress">
@@ -170,7 +181,22 @@
                             {% if field.is_required %}<span class="required">*</span>{% endif %}
                         </label>
 
-                        {% if field.field_type == 'text' %}
+                        {# 姓名 #}
+                        {% if field.validation_rule == 'name' %}
+                            <input type="text"
+                                   class="form-control {% if field.field_key in errors %}is-invalid{% endif %} name-source-field {% if field.is_readonly %}bg-light text-secondary{% endif %}"
+                                   id="{{ field.field_key }}"
+                                   name="{{ field.field_key }}"
+                                   value="{{ page_data|get_item:field.field_key }}"
+                                   placeholder="{{ field.placeholder|default:'请输入姓名' }}"
+                                   maxlength="{{ field.max_length|default:'30' }}"
+                                   {% if not field.is_readonly %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
+                                   {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
+                                   {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
+
+                        {# 文本输入 #}
+                        {% elif field.field_type == 'text' %}
                             <input type="text"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
                                    id="{{ field.field_key }}"
@@ -178,6 +204,7 @@
                                    value="{{ page_data|get_item:field.field_key }}"
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'textarea' %}
                             <textarea class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
                                       id="{{ field.field_key }}"
@@ -185,6 +212,7 @@
                                       rows="3"
                                       {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                       {% if field.is_required and not field.is_readonly %}required{% endif %}>{% if page_data %}{{ page_data|get_item:field.field_key }}{% endif %}</textarea>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'number' %}
                             <input type="number"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -193,6 +221,7 @@
                                    value="{{ page_data|get_item:field.field_key }}"
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'phone' or field.validation_rule == 'phone' %}
                             <input type="tel"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -201,8 +230,10 @@
                                    value="{{ page_data|get_item:field.field_key }}"
                                    placeholder="{{ field.placeholder|default:'请输入手机号' }}"
                                    maxlength="{{ field.max_length|default:'11' }}"
+                                   data-is-phone="true"
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'id_card' or field.validation_rule == 'id_card' %}
                             <input type="text"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -215,26 +246,12 @@
                                    {% if not field.is_readonly %}onblur="parseIdCard(this)"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
-                        {% elif field.field_type == 'name' or field.validation_rule == 'name' %}
-                            <input type="text"
-                                   class="form-control {% if field.field_key in errors %}is-invalid{% endif %} name-source-field {% if field.is_readonly %}bg-light text-secondary{% endif %}"
-                                   id="{{ field.field_key }}"
-                                   name="{{ field.field_key }}"
-                                   value="{{ page_data|get_item:field.field_key }}"
-                                   placeholder="{{ field.placeholder|default:'请输入姓名' }}"
-                                   maxlength="{{ field.max_length|default:'30' }}"
-                                   {% if not field.is_readonly %}data-pinyin-target="{{ field.field_key }}"{% endif %}
-                                   {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
-                                   {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'name_pinyin' %}
-                            <input type="text"
-                                   class="form-control bg-light"
-                                   style="overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;"
-                                   id="{{ field.field_key }}"
-                                   name="{{ field.field_key }}"
-                                   value="{{ page_data|get_item:field.field_key }}"
-                                   placeholder="根据姓名自动生成"
-                                   {% if field.is_required %}required{% endif %}>
+                            <div class="form-control bg-light" style="overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;-webkit-user-select:text;min-height:38px;line-height:1.5;display:flex;align-items:center;">
+                                <span id="{{ field.field_key }}" name="{{ field.field_key }}" class="{% if not page_data|get_item:field.field_key %}text-muted{% endif %}">{{ page_data|get_item:field.field_key|default:'根据中文姓名自动生成' }}</span>
+                            </div>
+                            <input type="hidden" id="{{ field.field_key }}_hidden" name="{{ field.field_key }}" value="{{ page_data|get_item:field.field_key }}">
 
                         {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
                             <input type="text"
@@ -245,8 +262,10 @@
                                    placeholder="{{ field.placeholder|default:'请输入申请金额' }}"
                                    maxlength="{{ field.max_length|default:'12' }}"
                                    inputmode="decimal"
+                                   data-is-amount="true"
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'date' %}
                             <input type="text"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -262,6 +281,7 @@
                                   {% if 'expiry' in field.field_key|lower or 'validity' in field.field_key|lower or field.field_key == 'AP_CED_DATE' %}data-is-idcard-expiry="true"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'select' %}
                             <select class="form-control {% if field.field_key in errors %}is-invalid{% endif %}"
                                     id="{{ field.field_key }}"
@@ -275,6 +295,7 @@
                                     {% endfor %}
                                 {% endwith %}
                             </select>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'radio' %}
                             <div class="mt-2">
                                 {% with field.options|parse_options as options %}
@@ -355,7 +376,7 @@
             <!-- 固定底部按钮 -->
             <div class="fixed-bottom-btn">
                 {% if is_last %}
-                    <button type="submit" class="btn-submit w-100">提交申请</button>
+                    <button type="submit" class="btn-submit w-100 post-confirm">提交申请</button>
                 {% else %}
                     <button type="submit" class="btn-next w-100">下一步</button>
                 {% endif %}
@@ -363,7 +384,29 @@
         </form>
     </div>
 
+    <!-- 二次确认弹窗 -->
+    {% if is_last %}
+    <div class="modal fade" id="postSubmitConfirmModal" tabindex="-1" aria-labelledby="postSubmitConfirmTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="postSubmitConfirmTitle">请确认</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body" id="postSubmitConfirmBody">确定要提交吗？</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="postSubmitConfirmOk">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% if is_last %}
+    <script src="{% static 'js/post_confirm.js' %}"></script>
+    {% endif %}
     <script>
         // 中文姓名转拼音映射表
         var pinyinMap = {
@@ -428,16 +471,26 @@
         // 更新姓名拼音字段（优先使用后端API，失败则用本地映射表）
         var pinyinController = null;  // 用于取消上次请求的 AbortController
         function updatePinyinField(nameField, pinyinTargetId) {
-            var pinyinField = document.getElementById(pinyinTargetId);
-            // 备选：如果找不到指定ID，查找name_pinyin类型的字段
-            if (!pinyinField) {
-                pinyinField = document.querySelector('input[name$="_pinyin"], input[name="name_pinyin"]');
+            console.log('[拼音H5] updatePinyinField 调用，pinyinTargetId: ' + pinyinTargetId);
+            // 主字段：span 显示元素
+            var pinyinSpan = document.getElementById(pinyinTargetId);
+            console.log('[拼音H5] 通过ID查找拼音span: ' + (pinyinSpan ? '找到 ' + pinyinSpan.id : '未找到'));
+            // 隐藏字段：用于表单提交
+            var hiddenInput = document.getElementById(pinyinTargetId + '_hidden');
+            console.log('[拼音H5] 查找对应hidden input: ' + (hiddenInput ? '找到 ' + hiddenInput.id : '未找到'));
+
+            if (!pinyinSpan || !nameField) {
+                console.log('[拼音H5] 拼音span或姓名字段为空，终止');
+                return;
             }
-            if (!pinyinField || !nameField) return;
 
             var name = nameField.value.trim();
+            console.log('[拼音H5] 姓名为: ' + name);
             if (!name) {
-                pinyinField.value = '';
+                // 清空显示和隐藏字段
+                pinyinSpan.textContent = '';
+                if (hiddenInput) hiddenInput.value = '';
+                console.log('[拼音H5] 姓名为空，清空拼音字段');
                 return;
             }
 
@@ -447,51 +500,67 @@
             }
             pinyinController = new AbortController();
 
+            // 统一的更新函数
+            function setPinyinValue(pinyin) {
+                pinyinSpan.textContent = pinyin;  // 更新span显示
+                if (hiddenInput) hiddenInput.value = pinyin;  // 更新hidden input用于提交
+            }
+
             // 调用后端API获取拼音
             fetch('/apply/api/pinyin/?name=' + encodeURIComponent(name), { signal: pinyinController.signal })
                 .then(function(response) { return response.json(); })
                 .then(function(data) {
                     if (data.success && data.pinyin) {
-                        pinyinField.value = data.pinyin;
+                        console.log('[拼音H5] API返回成功，拼音: ' + data.pinyin);
+                        setPinyinValue(data.pinyin);
                     } else {
                         // API失败时使用本地映射表
-                        pinyinField.value = chineseToPinyin(name);
+                        console.log('[拼音H5] API返回失败，使用本地映射表');
+                        setPinyinValue(chineseToPinyin(name));
                     }
                 })
                 .catch(function(err) {
                     // 如果是取消的请求，不做处理
                     if (err.name === 'AbortError') return;
                     // 出错时使用本地映射表
-                    pinyinField.value = chineseToPinyin(name);
+                    console.log('[拼音H5] API请求异常，使用本地映射表');
+                    setPinyinValue(chineseToPinyin(name));
                 });
         }
-
-        // 绑定姓名字段的事件
-        document.querySelectorAll('.name-source-field').forEach(function(nameField) {
-            var pinyinTargetId = nameField.getAttribute('data-pinyin-target');
-            if (pinyinTargetId) {
-                nameField.addEventListener('input', function() {
-                    updatePinyinField(this, pinyinTargetId);
-                });
-                // 初始化（如果姓名字段已有值）
-                if (nameField.value) {
-                    updatePinyinField(nameField, pinyinTargetId);
-                }
-            }
-        });
 
         // 姓名校验
         function validateName(input) {
             var value = input.value.trim();
             var feedback = input.nextElementSibling;
-            if (value && !/^[\u4e00-\u9fff·]{1,15}$/.test(value)) {
+
+            // 总长度校验（2-15字符，含·）
+            if (value && !/^[\u4e00-\u9fff·]{2,15}$/.test(value)) {
                 input.classList.add('is-invalid');
                 if (feedback && feedback.classList.contains('invalid-feedback')) {
-                    feedback.textContent = '姓名须为1～15个汉字';
+                    feedback.textContent = '姓名须为2～15个汉字';
                     feedback.style.display = 'block';
                 }
                 return false;
             }
+
+            // 少数民族·分段校验：每段至少包含2个汉字
+            var segments = value.split('·');
+            for (var i = 0; i < segments.length; i++) {
+                var seg = segments[i];
+                var chineseChars = seg.match(/[\u4e00-\u9fff]/g);
+                var chineseCount = chineseChars ? chineseChars.length : 0;
+                if (chineseCount < 2) {
+                    input.classList.add('is-invalid');
+                    if (feedback && feedback.classList.contains('invalid-feedback')) {
+                        feedback.textContent = '姓名须为2～15个汉字';
+                        feedback.style.display = 'block';
+                    }
+                    return false;
+                }
+            }
+
+            // 校验通过，移除错误样式
+            clearInvalid(input);
             return true;
         }
 
@@ -507,6 +576,8 @@
                 }
                 return false;
             }
+            // 校验通过，移除错误样式
+            clearInvalid(input);
             return true;
         }
 
@@ -533,6 +604,7 @@
                 if (!birthDateField.value || birthDateField.dataset.autoFilled === 'true') {
                     birthDateField.value = birthDate;
                     birthDateField.dataset.autoFilled = 'true';
+                    clearInvalid(birthDateField);
                 }
             }
 
@@ -542,6 +614,7 @@
                 if (!genderField.value || genderField.dataset.autoFilled === 'true') {
                     genderField.value = gender;
                     genderField.dataset.autoFilled = 'true';
+                    clearInvalid(genderField);
                 }
             }
         }
@@ -650,19 +723,78 @@
 
         // 表单提交时的完整校验
         function validateFormOnSubmit(form) {
-            // 通过 data 属性获取身份证号
+            // ===== 1. 必填字段通用校验 =====
+            var requiredFields = form.querySelectorAll('[required]');
+            var firstEmpty = null;
+            for (var i = 0; i < requiredFields.length; i++) {
+                var f = requiredFields[i];
+                var val = f.value ? f.value.trim() : '';
+                if (!val) {
+                    f.classList.add('is-invalid');
+                    // 查找最近的 invalid-feedback：先找直接兄弟，再在父容器内找
+                    var fb = f.nextElementSibling;
+                    if (!fb || !fb.classList.contains('invalid-feedback')) {
+                        fb = f.parentElement.querySelector('.invalid-feedback');
+                    }
+                    if (fb && fb.classList.contains('invalid-feedback')) {
+                        var fieldId = f.id || f.getAttribute('name');
+                        var label = fieldId ? document.querySelector('label[for="' + fieldId + '"]') : null;
+                        var fieldLabel = label ? label.textContent.replace(/[*""]/g, '').trim() : fieldId;
+                        fb.textContent = '"' + fieldLabel + '"为必填项';
+                        fb.style.display = 'block';
+                    }
+                    if (!firstEmpty) firstEmpty = f;
+                }
+            }
+            if (firstEmpty) {
+                firstEmpty.focus();
+                return false;
+            }
+
+            // ===== 2. 姓名格式校验 =====
+            var nameFields = document.querySelectorAll('.name-source-field');
+            for (var i = 0; i < nameFields.length; i++) {
+                if (!validateName(nameFields[i])) {
+                    nameFields[i].focus();
+                    return false;
+                }
+            }
+
+            // ===== 3. 格式字段重扫：身份证号 =====
+            var idCardInputs = document.querySelectorAll('input[data-is-idcard="true"]');
+            for (var i = 0; i < idCardInputs.length; i++) {
+                if (!validateIdCard(idCardInputs[i])) {
+                    idCardInputs[i].focus();
+                    return false;
+                }
+            }
+
+            // ===== 4. 格式字段重扫：手机号 =====
+            var phoneInputs = document.querySelectorAll('input[data-is-phone="true"]');
+            for (var i = 0; i < phoneInputs.length; i++) {
+                if (!validatePhone(phoneInputs[i])) {
+                    phoneInputs[i].focus();
+                    return false;
+                }
+            }
+
+            // ===== 5. 格式字段重扫：金额 =====
+            var amountInputs = document.querySelectorAll('input[data-is-amount="true"]');
+            for (var i = 0; i < amountInputs.length; i++) {
+                if (!validateAmount(amountInputs[i])) {
+                    amountInputs[i].focus();
+                    return false;
+                }
+            }
+
+            // ===== 6. 身份证一致性校验 =====
             var idCardInput = document.querySelector('input[data-is-idcard="true"]');
             var idCardValue = idCardInput ? idCardInput.value.trim() : '';
-
-            // 通过 data 属性获取出生日期
             var birthDateInput = document.querySelector('input[data-is-birthdate="true"]');
             var birthDateValue = birthDateInput ? birthDateInput.value.trim() : '';
-
-            // 通过 data 属性获取性别
             var genderInput = document.querySelector('select[data-is-gender="true"]');
             var genderValue = genderInput ? genderInput.value : '';
 
-            // 校验一致性
             if (idCardValue && /^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dX]$/i.test(idCardValue)) {
                 var consistencyResult = validateIdCardConsistency(idCardValue, birthDateValue, genderValue);
                 if (!consistencyResult.valid) {
@@ -672,7 +804,7 @@
                 }
             }
 
-            // 校验年龄
+            // ===== 7. 年龄校验 =====
             if (idCardValue && birthDateValue) {
                 var ageResult = validateApplicantAge(idCardValue, birthDateValue);
                 if (!ageResult.valid) {
@@ -681,7 +813,7 @@
                 }
             }
 
-            // 校验身份证有效期
+            // ===== 8. 身份证有效期校验 =====
             var expiryInput = document.querySelector('input[data-is-idcard-expiry="true"]');
             if (expiryInput) {
                 var expiryValue = expiryInput.value.trim();
@@ -691,6 +823,14 @@
                     expiryInput.focus();
                     return false;
                 }
+            }
+
+            // ===== 校验全部通过，设置弹窗姓名内容（使用申请人姓名字段） =====
+            var confirmBody = document.getElementById('postSubmitConfirmBody');
+            if (confirmBody) {
+                var applicantNameField = document.getElementById('applicant_name');
+                var nameValue = applicantNameField ? applicantNameField.value.trim() : '';
+                confirmBody.textContent = nameValue ? '确定要提交"' + nameValue + '"的申请吗？' : '确定要提交吗？';
             }
 
             return true;
@@ -708,6 +848,8 @@
                 }
                 return false;
             }
+            // 校验通过，移除错误样式
+            clearInvalid(input);
             return true;
         }
 
@@ -723,6 +865,8 @@
                 }
                 return false;
             }
+            // 校验通过，移除错误样式
+            clearInvalid(input);
             return true;
         }
 
@@ -749,6 +893,8 @@
                 }
                 return false;
             }
+            // 校验通过，移除错误样式
+            clearInvalid(input);
             return true;
         }
 
@@ -787,6 +933,7 @@
             if (input) {
                 input.addEventListener('blur', function() { validateAmount(this); });
                 input.addEventListener('input', function() { clearInvalid(this); });
+                input.addEventListener('blur', function() { clearInvalid(this); });
             }
         })();
         {% endif %}
@@ -800,6 +947,44 @@
         })();
         {% endif %}
         {% endfor %}
+
+        // 出生日期、性别、身份证有效期字段：blur时清除错误提示
+        document.querySelectorAll('input[data-field-type="date"]').forEach(function(input) {
+            input.addEventListener('blur', function() { clearInvalid(this); });
+        });
+        document.querySelectorAll('select[data-is-gender="true"]').forEach(function(input) {
+            input.addEventListener('blur', function() { clearInvalid(this); });
+        });
+        document.querySelectorAll('input[data-is-idcard-expiry="true"]').forEach(function(input) {
+            input.addEventListener('blur', function() { clearInvalid(this); });
+        });
+
+        // 所有普通text字段：blur时清除错误提示（排除已有特定处理的字段）
+        document.querySelectorAll('input[type="text"]').forEach(function(input) {
+            if (!input.readOnly && !input.hasAttribute('data-is-idcard') &&
+                !input.hasAttribute('data-is-birthdate') &&
+                !input.hasAttribute('data-is-idcard-expiry') &&
+                !input.hasAttribute('data-is-amount')) {
+                input.addEventListener('blur', function() { clearInvalid(this); });
+            }
+        });
+
+        // 通用姓名拼音绑定（H5风格，确保所有name-source-field都生效）
+        document.querySelectorAll('.name-source-field').forEach(function(nameField) {
+            var pinyinTargetId = nameField.getAttribute('data-pinyin-target');
+            if (pinyinTargetId) {
+                nameField.addEventListener('input', function() {
+                    updatePinyinField(this, pinyinTargetId);
+                });
+                nameField.addEventListener('blur', function() {
+                    updatePinyinField(this, pinyinTargetId);
+                });
+                // 初始化（如果姓名字段已有值）
+                if (nameField.value) {
+                    updatePinyinField(nameField, pinyinTargetId);
+                }
+            }
+        });
 
         // 图片压缩并转 base64
         function compressAndConvert(file, callback) {
@@ -882,6 +1067,48 @@
                 base64Input.value = base64;
             });
         }
+    </script>
+
+    <script>
+    // ===== 方案A：历史守卫 - 防止用户通过返回键回到已提交的表单 =====
+    (function() {
+        var SUBMITTED_KEY = 'form_submitted_h5_{{ product.id|default:"0" }}';
+
+        // 进来就检查 sessionStorage 标记
+        if (sessionStorage.getItem(SUBMITTED_KEY)) {
+            sessionStorage.removeItem(SUBMITTED_KEY);
+            // 跳转到银行大厅
+            window.location.replace('{% url "apply:bank_hall" %}');
+            return;
+        }
+
+        // 压入两条历史，保证 popstate 可被捕获
+        history.replaceState({form: 'active'}, '', location.href);
+        history.pushState({form: 'guard'}, '', location.href);
+
+        window.addEventListener('popstate', function(event) {
+            // 点了返回键 → 已提交则跳走，否则锁死
+            if (sessionStorage.getItem(SUBMITTED_KEY)) {
+                sessionStorage.removeItem(SUBMITTED_KEY);
+                window.location.replace('{% url "apply:bank_hall" %}');
+            } else {
+                history.pushState({form: 'guard'}, '', location.href);
+            }
+        });
+    })();
+
+    // 最后一步提交时写入已提交标记（配合历史守卫）
+    document.addEventListener('DOMContentLoaded', function() {
+        var form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function() {
+                var isLast = document.querySelector('input[name="is_last"]');
+                if (isLast && isLast.value === 'true') {
+                    sessionStorage.setItem('form_submitted_h5_{{ product.id|default:"0" }}', '1');
+                }
+            });
+        }
+    });
     </script>
 </body>
 </html>

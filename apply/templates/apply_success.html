@@ -56,6 +56,14 @@
 </div>
 
 <script>
+    // ===== 禁止返回到申请表单（防止重复提交）=====
+    history.replaceState({page: 'success'}, '', location.href);
+    history.pushState({page: 'success_guard'}, '', location.href);
+    window.addEventListener('popstate', function(e) {
+        window.location.replace("{% url 'apply:loan_product_list' %}");
+    });
+
+    // ===== 倒计时自动返回首页 =====
     let seconds = 5;
     const countdownEl = document.getElementById('countdown-seconds');
     const btnBackHome = document.getElementById('btn-back-home');
@@ -65,7 +73,7 @@
         seconds--;
         if (seconds <= 0) {
             clearInterval(timer);
-            window.location.href = "{% url 'apply:home' %}";
+            window.location.replace("{% url 'apply:loan_product_list' %}");
         } else {
             countdownEl.textContent = seconds;
         }
@@ -73,6 +81,7 @@
 
     btnBackHome.addEventListener('click', function() {
         clearInterval(timer);
+        window.location.replace("{% url 'apply:loan_product_list' %}");
     });
 </script>
 </body>

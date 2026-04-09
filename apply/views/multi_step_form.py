@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+import uuid
 
 from apply.models import FormPage, FormField, CardProduct, Application
 from apply.utils.applicant_validate import (
@@ -353,6 +354,25 @@ def _validate_step_data(page_fields, post_data, product=None):
     if id_card_expiry_value:
         today_str = today.strftime('%Y%m%d')
 
+        # 年龄≥46时，允许有效期为"长期"（20991231）
+        if id_card_expiry_value == '20991231':
+            if id_card_value:
+                try:
+                    birth_year = int(id_card_value[6:10])
+                    birth_month = int(id_card_value[10:12])
+                    birth_day = int(id_card_value[12:14])
+                    calc_age = today.year - birth_year
+                    if (today.month, today.day) < (birth_month, birth_day):
+                        calc_age -= 1
+                    if calc_age < 46:
+                        for f in page_fields:
+                            if 'expiry' in f.field_key.lower() or 'validity' in f.field_key.lower():
+                                errors[f.field_key] = '仅限46周岁及以上申请人填写"长期"作为有效期'
+                                break
+                except (ValueError, IndexError):
+                    pass
+            return (len(errors) == 0, errors)
+
         # 检查是否已过期
         if id_card_expiry_value < today_str:
             for f in page_fields:
@@ -461,6 +481,23 @@ def multi_step_form_view(request, product_id):
             _save_session_form_data(request, session_data)
             return redirect(f'{request.path}?step={step - 1}')
 
+        # ===== Plan B Token 校验 =====（在数据校验之后、业务保存之前）
+        form_token = request.session.get('form_token', '')
+        submitted_token = request.POST.get('_form_token', '')
+        session_token = form_token
+        token_used = request.session.get('form_token_used', False)
+        if not submitted_token or submitted_token != session_token or token_used:
+            messages.error(request, '表单已失效，请重新发起申请')
+            return render(request, 'multi_step_form.html', {
+                'product': product,
+                'form_pages': form_pages,
+                'current_page': current_page,
+                'current_step': step,
+                'page_data': _get_session_form_data(request),
+                'errors': {'_form_token': '表单已失效，请重新发起申请'},
+                'form_token': form_token,
+            })
+
         # 校验当前页数据（传入product用于金额区间校验）
         is_valid, errors = _validate_step_data(page_fields, request.POST, product=product)
 
@@ -477,6 +514,7 @@ def multi_step_form_view(request, product_id):
                 'current_step': step,
                 'page_data': session_data,
                 'errors': errors,
+                'form_token': form_token,
             })
 
         # 保存当前页数据到Session
@@ -491,6 +529,8 @@ def multi_step_form_view(request, product_id):
 
         # 如果是最后一步，保存Application
         if is_last:
+            # 标记 Token 为已用，防止刷新重提
+            request.session['form_token_used'] = True
             return _save_application(request, session_data, product, user_bank)
         else:
             # 返回下一步
@@ -504,8 +544,13 @@ def multi_step_form_view(request, product_id):
     if step == 0:
         existing_data = _get_session_form_data(request)
         if not existing_data:
-            # 新的申请流程，清除旧数据
+            # 新的申请流程，清除旧数据，并生成新的表单Token
             _clear_session_form_data(request)
+            request.session['form_token'] = str(uuid.uuid4())
+            request.session.pop('form_token_used', None)
+
+    # 取出当前表单Token（GET step=0 时刚生成，后续步骤复用）
+    form_token = request.session.get('form_token', '')
 
     # 限制step范围
     if step >= len(form_pages):
@@ -535,6 +580,7 @@ def multi_step_form_view(request, product_id):
         'page_data': session_data,
         'is_last': is_last,
         'errors': {},
+        'form_token': form_token,
     })
 
 
@@ -658,6 +704,23 @@ def h5_multi_step_form_view(request, product_id):
             _save_session_form_data(request, session_data)
             return redirect(f'{request.path}?step={step - 1}')
 
+        # ===== Plan B Token 校验 =====
+        form_token = request.session.get('form_token', '')
+        submitted_token = request.POST.get('_form_token', '')
+        session_token = form_token
+        token_used = request.session.get('form_token_used', False)
+        if not submitted_token or submitted_token != session_token or token_used:
+            messages.error(request, '表单已失效，请重新发起申请')
+            return render(request, 'h5_multi_step_form.html', {
+                'product': product,
+                'form_pages': form_pages,
+                'current_page': current_page,
+                'current_step': step,
+                'page_data': _get_session_form_data(request),
+                'errors': {'_form_token': '表单已失效，请重新发起申请'},
+                'form_token': form_token,
+            })
+
         # 校验当前页数据（传入product用于金额区间校验）
         # 合并 page_data 到 POST，确保图片的 base64 数据被正确验证
         validate_data = dict(request.POST)
@@ -678,6 +741,7 @@ def h5_multi_step_form_view(request, product_id):
                 'page_data': session_data,
                 'errors': errors,
                 'is_last': is_last,
+                'form_token': form_token,
             })
 
         # 保存当前页数据到Session
@@ -691,6 +755,8 @@ def h5_multi_step_form_view(request, product_id):
         _save_session_form_data(request, session_data)
 
         if is_last:
+            # 标记 Token 为已用，防止刷新重提
+            request.session['form_token_used'] = True
             return _h5_save_application(request, session_data, product)
         else:
             return redirect(f'{request.path}?step={step + 1}')
@@ -703,6 +769,8 @@ def h5_multi_step_form_view(request, product_id):
         existing_data = _get_session_form_data(request)
         if not existing_data:
             _clear_session_form_data(request)
+            request.session['form_token'] = str(uuid.uuid4())
+            request.session.pop('form_token_used', None)
 
     if step >= len(form_pages):
         step = 0
@@ -710,6 +778,7 @@ def h5_multi_step_form_view(request, product_id):
     current_page = form_pages[step]
     is_last = (step == len(form_pages) - 1)
     session_data = _get_session_form_data(request)
+    form_token = request.session.get('form_token', '')
 
     # 如果是"银行专用栏"页面，自动注入银行号字段（只读）
     current_page_title = current_page['page'].page_title
@@ -729,6 +798,7 @@ def h5_multi_step_form_view(request, product_id):
         'page_data': session_data,
         'is_last': is_last,
         'errors': {},
+        'form_token': form_token,
     })
 
 
@@ -772,5 +842,9 @@ def _h5_save_application(request, form_data, product):
 
     _clear_session_form_data(request)
 
-    # H5成功页
-    return redirect('apply:apply_success', pk=app.pk)
+    # H5专用成功页（移动端适配，有5秒倒计时和返回银行大厅按钮）
+    # server_host 用于手机访问时拼接正确的局域网地址
+    return render(request, 'apply_h5_success.html', {
+        'application': app,
+        'server_host': request.get_host(),
+    })

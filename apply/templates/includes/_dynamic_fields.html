@@ -85,8 +85,24 @@
                             {% with first_form_page|is_same_page:page as is_basic_info_page %}
                             {% with is_basic_info_page|or_readonly:field.is_readonly as is_readonly_field %}
 
+                                {# 姓名 #}
+                                {% if field.validation_rule == 'name' %}
+                                    <input type="text"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %} name-source-field"
+                                           name="{{ field.field_key }}"
+                                           id="field_{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'请输入姓名' }}"
+                                           maxlength="{{ field.max_length|default:'30' }}"
+                                           data-pinyin-target="{{ field.field_key }}_pinyin"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
+
                                 {# 文本输入 #}
-                                {% if field.field_type == 'text' %}
+                                {% elif field.field_type == 'text' %}
                                     <input type="text"
                                            class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}{% if field.validation_rule == 'name' %} js-name-field{% endif %}"
                                            name="{{ field.field_key }}"

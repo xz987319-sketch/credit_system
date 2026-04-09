@@ -7,6 +7,12 @@
 {% get_core_field_labels as core_labels %}
 
 {% block content %}
+<style>
+    /* 后端返回的错误提示默认显示，不被Bootstrap隐藏 */
+    .card-body .text-danger.small.mt-1[data-backend-error] {
+        display: block !important;
+    }
+</style>
 <h1 class="h4 mb-3">补充资料 #{{ application.id }}</h1>
 {% if application.return_reason %}
 <p class="text-muted">
@@ -35,11 +41,11 @@
                     <div class="form-control bg-light text-secondary">{{ application.applicant_name }}</div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label text-muted small">{{ core_labels.id_card|default:"身份证号" }}</label>
+                    <label class="form-label text-muted small">{{ core_labels.id_card|default:"证件号码" }}</label>
                     <div class="form-control bg-light text-secondary">{{ application.id_card }}</div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label text-muted small">{{ core_labels.phone|default:"手机号码" }}</label>
+                    <label class="form-label text-muted small">{{ core_labels.phone|default:"手机号" }}</label>
                     <div class="form-control bg-light text-secondary">{{ application.phone }}</div>
                 </div>
             </div>
@@ -157,11 +163,32 @@ document.addEventListener('DOMContentLoaded', function() {
     var form = document.querySelector('form[method="post"]');
     if (!form) return;
 
-    // 姓名校验（1-15个汉字，可含·）
+    // 姓名校验：至少2个汉字，最多15个汉字，少数民族·后需≥2个汉字，只能输入汉字
     function validateName(input) {
         var value = input.value.trim();
-        if (value && !/^[\u4e00-\u9fff·]{1,15}$/.test(value)) {
-            showFieldError(input, '姓名须为1～15个汉字，可包含少数民族用间隔符"·"');
+        if (!value) return true;
+        // 检查 · 后是否 ≥2 个汉字
+        var dotParts = value.split('·');
+        for (var i = 1; i < dotParts.length; i++) {
+            var partChinese = dotParts[i].match(/[\u4e00-\u9fa5]/g) || [];
+            if (partChinese.length < 2) {
+                showFieldError(input, '间隔符"·"后至少需要2个汉字');
+                return false;
+            }
+        }
+        // 统计汉字数量
+        var chineseChars = value.match(/[\u4e00-\u9fa5]/g) || [];
+        var chineseCount = chineseChars.length;
+        if (chineseCount < 2) {
+            showFieldError(input, '姓名须至少包含2个汉字');
+            return false;
+        }
+        if (chineseCount > 15) {
+            showFieldError(input, '姓名不能超过15个汉字');
+            return false;
+        }
+        if (!/^[\u4e00-\u9fa5·]+$/.test(value)) {
+            showFieldError(input, '姓名只能输入汉字');
             return false;
         }
         hideFieldError(input);
@@ -206,23 +233,32 @@ document.addEventListener('DOMContentLoaded', function() {
         input.classList.add('is-invalid');
         var feedback = input.nextElementSibling;
         if (feedback && (feedback.classList.contains('invalid-feedback') || feedback.classList.contains('text-danger'))) {
+            // 找到后端渲染的错误div → 标记它，这样input事件会正确隐藏它
             feedback.textContent = message;
             feedback.style.display = 'block';
+            feedback.setAttribute('data-jk-error', '1');
         } else {
-            // 创建错误提示
+            // 没有现成的错误div → JS创建一个新的（带标记）
             var div = document.createElement('div');
             div.className = 'text-danger small mt-1';
             div.textContent = message;
+            div.style.display = 'block';
+            div.setAttribute('data-jk-error', '1');
             input.parentNode.insertBefore(div, input.nextSibling);
         }
     }
 
-    // 隐藏字段错误
+    // 隐藏字段错误：隐藏所有标记为JS错误或后端错误的div（统一处理）
     function hideFieldError(input) {
         input.classList.remove('is-invalid');
-        var feedback = input.nextElementSibling;
-        if (feedback && (feedback.classList.contains('invalid-feedback') || feedback.classList.contains('text-danger'))) {
-            feedback.style.display = 'none';
+        // 查找当前字段后面所有带 data-jk-error 的错误提示div，全部隐藏
+        var node = input.nextElementSibling;
+        while (node) {
+            if (node.classList && (node.classList.contains('invalid-feedback') || node.classList.contains('text-danger'))) {
+                node.style.display = 'none';
+                node.removeAttribute('data-jk-error');
+            }
+            node = node.nextElementSibling;
         }
     }
 
@@ -241,9 +277,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // 手机号字段：type="tel" 或 validation_rule="phone" 的字段（含联系人手机等）
     var phoneFields = form.querySelectorAll('input[type="tel"], input[maxlength="11"][type="text"]');
     phoneFields.forEach(function(field) {
-        if (field.name.toLowerCase().includes('phone') || field.name.toLowerCase().includes('手机')) {
+        // 扩大范围：包含直系联系人手机、其他联系人手机等字段
+        if (field.type === 'tel' || field.name.toLowerCase().includes('phone') || field.name.toLowerCase().includes('手机') || field.getAttribute('data-validation-rule') === 'phone') {
             field.addEventListener('blur', function() { validatePhone(this); });
             field.addEventListener('input', function() { hideFieldError(this); });
         }
