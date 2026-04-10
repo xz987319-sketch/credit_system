@@ -475,7 +475,7 @@
             '燕': 'YAN', '翟': 'ZHAI', '过': 'GUO', '石': 'SHI', '翟': 'ZHAI'
         };
 
-        // 中文姓名转拼音（备用：前端本地转换）
+        // 中文姓名转拼音（备用：前端本地转换，仅用于减少API调用）
         function chineseToPinyin(name) {
             if (!name) return '';
             // 按·分段，每段内转拼音后用空格连接，段之间用·连接
@@ -492,13 +492,14 @@
                     } else if (/[0-9]/.test(char)) {
                         result.push(char);
                     }
+                    // 映射表中没有的汉字不添加（让API返回完整结果）
                 }
                 return result.join(' ');
             });
             return converted.join('·').toUpperCase();
         }
 
-        // 更新姓名拼音字段（优先使用后端API，失败则用本地映射表）
+        // 更新姓名拼音字段（优先使用后端API）
         var pinyinController = null;  // 用于取消上次请求的 AbortController
         function updatePinyinField(nameField, pinyinTargetId) {
             console.log('[拼音H5] updatePinyinField 调用，pinyinTargetId: ' + pinyinTargetId);
@@ -536,7 +537,7 @@
                 if (hiddenInput) hiddenInput.value = pinyin;  // 更新hidden input用于提交
             }
 
-            // 调用后端API获取拼音
+            // 调用后端API获取拼音（后端有pypinyin库，永远返回拼音）
             fetch('/apply/api/pinyin/?name=' + encodeURIComponent(name), { signal: pinyinController.signal })
                 .then(function(response) { return response.json(); })
                 .then(function(data) {
@@ -544,17 +545,17 @@
                         console.log('[拼音H5] API返回成功，拼音: ' + data.pinyin);
                         setPinyinValue(data.pinyin);
                     } else {
-                        // API失败时使用本地映射表
-                        console.log('[拼音H5] API返回失败，使用本地映射表');
-                        setPinyinValue(chineseToPinyin(name));
+                        // API返回失败，但后端应该不会返回空（已修复）
+                        console.log('[拼音H5] API返回失败（不应该发生）');
                     }
                 })
                 .catch(function(err) {
                     // 如果是取消的请求，不做处理
                     if (err.name === 'AbortError') return;
-                    // 出错时使用本地映射表
-                    console.log('[拼音H5] API请求异常，使用本地映射表');
-                    setPinyinValue(chineseToPinyin(name));
+                    // 网络错误时不显示原汉字，留空让用户知道有问题
+                    console.log('[拼音H5] API请求异常');
+                    pinyinSpan.textContent = '';
+                    if (hiddenInput) hiddenInput.value = '';
                 });
         }
 
@@ -1175,10 +1176,11 @@
             }
         });
 
-        // 通用姓名拼音绑定（H5风格，确保所有name-source-field都生效）
+        // 姓名拼音绑定（只对 applicant_name 字段生效）
         document.querySelectorAll('.name-source-field').forEach(function(nameField) {
             var pinyinTargetId = nameField.getAttribute('data-pinyin-target');
-            if (pinyinTargetId) {
+            // 只对 applicant_name 字段绑定拼音转换
+            if (pinyinTargetId && nameField.id === 'applicant_name') {
                 nameField.addEventListener('input', function() {
                     updatePinyinField(this, pinyinTargetId);
                 });

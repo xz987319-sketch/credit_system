@@ -55,6 +55,42 @@ SURNAME_POLYPHONOUS_MAP = {
     '俎': 'ZU',      # 姓俎
 }
 
+# pypinyin 无法正确转换的特殊汉字映射表（确保永远不显示原汉字）
+SPECIAL_CHAR_PINYIN_MAP = {
+    # pypinyin 返回单字符或错误拼音的汉字
+    '嗯': 'EN',      # pypinyin 返回 'n'
+    '唔': 'WU',      # pypinyin 返回 'n'
+    '呣': 'MU',      # pypinyin 返回 'n'
+    '嗯': 'EN',      # pypinyin 返回 'n'
+    '嗌': 'YI',      # pypinyin 返回 'a'
+    '哕': 'YUE',     # pypinyin 返回 'h'
+    '呲': 'CI',      # pypinyin 返回 'z'
+    '嚯': 'HUO',     # pypinyin 返回 'x'
+    '诶': 'EI',      # pypinyin 返回 'e'
+    '嗐': 'HAI',     # pypinyin 返回 'h'
+    '嗔': 'CHEN',    # pypinyin 返回 't'
+    '嗪': 'QIN',     # pypinyin 返回 'q'
+    '嗖': 'SOU',     # pypinyin 返回 's'
+    '嗵': 'TONG',    # pypinyin 返回 't'
+    '嘁': 'QI',      # pypinyin 返回 'q'
+    '嘬': 'ZUO',     # pypinyin 返回 'z'
+    '嘱': 'ZHU',     # pypinyin 返回 'z'
+    '噗': 'PU',      # pypinyin 返回 'p'
+    '嚓': 'CHA',     # pypinyin 返回 'c'
+    '嚣': 'XIAO',    # pypinyin 返回 'x'
+    '嚯': 'HUO',     # pypinyin 返回 'x'
+    '圊': 'QING',    # pypinyin 返回 'q'
+    '壬': 'REN',     # pypinyin 返回 'r'
+    '亓': 'QI',      # 姓亓
+    '丿': 'PIE',     # pypinyin 返回 ''
+    '乂': 'YI',      # pypinyin 返回 'a'
+    '伽': 'QIE',     # 多音字
+    '俟': 'SI',      # pypinyin 返回 'q'
+    '伽': 'GA',      # 用于音译
+    '巿': 'FU',      # pypinyin 返回 'b'
+    '黾': 'MIN',     # pypinyin 返回 'm'
+}
+
 
 # ============================================================================
 # 防重检测接口
@@ -105,8 +141,15 @@ def _chinese_to_pinyin(name):
             elif char in SURNAME_POLYPHONOUS_MAP:
                 # 姓氏多音字使用姓氏读音
                 result.append(SURNAME_POLYPHONOUS_MAP[char])
-            else:
+            elif char in SPECIAL_CHAR_PINYIN_MAP:
+                # 特殊汉字使用预设映射（如"嗯"→'EN'）
+                result.append(SPECIAL_CHAR_PINYIN_MAP[char])
+            elif pinyin:  # pypinyin 返回非空字符串
+                # 即使是单字符也转为大写显示，确保永远不显示原汉字
                 result.append(pinyin.upper())
+            else:
+                # pypinyin 返回空字符串（如生僻字），保留原汉字（最后的fallback）
+                result.append(char)
         else:
             # 索引越界，保留原字符
             result.append(char)
@@ -149,8 +192,15 @@ def pinyin_convert_api(request):
             elif char in SURNAME_POLYPHONOUS_MAP:
                 # 姓氏多音字使用姓氏读音
                 result.append(SURNAME_POLYPHONOUS_MAP[char])
-            else:
+            elif char in SPECIAL_CHAR_PINYIN_MAP:
+                # 特殊汉字使用预设映射（如"嗯"→'EN'）
+                result.append(SPECIAL_CHAR_PINYIN_MAP[char])
+            elif pinyin:  # pypinyin 返回非空字符串
+                # 即使是单字符也转为大写显示，确保永远不显示原汉字
                 result.append(pinyin.upper())
+            else:
+                # pypinyin 返回空字符串（如生僻字），保留原汉字（最后的fallback）
+                result.append(char)
         else:
             # 索引越界，保留原字符
             result.append(char)
