@@ -196,7 +196,7 @@
                             <div class="invalid-feedback"></div>
 
                         {# 短信验证码字段：横向布局（输入框+按钮） #}
-                        {% elif field.field_key == 'Verification_code' %}
+                        {% elif field.field_type == 'sms_code' or field.field_key == 'Verification_code' %}
                             <div class="d-flex align-items-center gap-2">
                                 <div style="flex: 1; min-width: 0;">
                                     <input type="text"
@@ -212,6 +212,7 @@
                                            oninput="this.value=this.value.replace(/[^0-9]/g,'')">
                                     <div class="invalid-feedback"></div>
                                 </div>
+                                {% if not field.is_readonly %}
                                 <button type="button"
                                         id="send_sms_btn"
                                         onclick="sendSmsCode()"
@@ -219,6 +220,7 @@
                                         style="white-space: nowrap; min-width: 90px; flex-shrink: 0;">
                                     获取验证码
                                 </button>
+                                {% endif %}
                             </div>
 
                         {# 文本输入 #}
@@ -1116,26 +1118,49 @@
         (function() {
             var input = document.querySelector('input[name="{{ field.field_key }}"]');
             if (input) {
-                var isComposing = false;  // 标记是否正在使用输入法
+                var composeTimer = null;  // 延迟过滤定时器
                 // 监听输入法输入状态
                 input.addEventListener('compositionstart', function() {
-                    isComposing = true;
-                });
-                input.addEventListener('compositionend', function() {
-                    isComposing = false;
-                    // 输入法输入完成后再过滤非汉字字符
-                    this.value = this.value.replace(/[^\u4e00-\u9fff·]/g, '');
-                    clearInvalid(this);
-                });
-                // 输入时过滤（输入法输入过程中跳过）
-                input.addEventListener('input', function() {
-                    if (!isComposing) {
-                        this.value = this.value.replace(/[^\u4e00-\u9fff·]/g, '');
-                        clearInvalid(this);
+                    // 输入法开始时，清除之前的延迟任务
+                    if (composeTimer) {
+                        clearTimeout(composeTimer);
+                        composeTimer = null;
                     }
                 });
-                // 失去焦点时校验
-                input.addEventListener('blur', function() { validateName(this); });
+                input.addEventListener('compositionend', function() {
+                    // 输入法结束时，延迟过滤（给浏览器一些时间更新DOM）
+                    var self = this;
+                    composeTimer = setTimeout(function() {
+                        self.value = self.value.replace(/[^\u4e00-\u9fff·]/g, '');
+                        clearInvalid(self);
+                        composeTimer = null;
+                    }, 10);
+                });
+                // 输入时过滤（防止粘贴等非输入法输入）
+                input.addEventListener('input', function(e) {
+                    // 如果正在使用输入法，跳过（由 compositionend 处理）
+                    if (e.isComposing) {
+                        return;
+                    }
+                    var self = this;
+                    // 延迟过滤，给浏览器时间完成输入
+                    if (composeTimer) {
+                        clearTimeout(composeTimer);
+                    }
+                    composeTimer = setTimeout(function() {
+                        self.value = self.value.replace(/[^\u4e00-\u9fff·]/g, '');
+                        clearInvalid(self);
+                        composeTimer = null;
+                    }, 10);
+                });
+                // 失去焦点时重置并校验
+                input.addEventListener('blur', function() {
+                    if (composeTimer) {
+                        clearTimeout(composeTimer);
+                        composeTimer = null;
+                    }
+                    validateName(this);
+                });
             }
         })();
         {% endif %}
