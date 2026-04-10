@@ -8,7 +8,7 @@ from django.utils import timezone  # 导入时区工具
 from django.views.decorators.http import require_http_methods, require_POST  # 导入 HTTP 限制
 
 from apply.forms import ReasonForm  # 导入原因表单
-from apply.models import Application, CardProduct  # 导入申请模型和卡产品模型
+from apply.models import Application, AuditLog, CardProduct  # 导入申请模型和卡产品模型
 from apply.models.form_config import FormPage  # 导入表单配置
 
 
@@ -91,6 +91,7 @@ def credit_pass_view(request, pk: int):  # 信审通过发卡
         return redirect("apply:credit_pending")  # 回列表
     card_number = f"6222{str(application.pk).zfill(12)}"  # 构造 16 位虚拟卡号
     now = timezone.now()  # 获取当前时间戳
+    previous_status = application.status  # 记录操作前状态
     application.card_number = card_number  # 写入卡号字段
     application.status = Application.ST_ISSUED  # 标记已发卡
     application.credit_time = now  # 记录信审结束时间
@@ -106,6 +107,16 @@ def credit_pass_view(request, pk: int):  # 信审通过发卡
         "form_data": dict(application.form_data or {}),  # 动态表单数据快照
     }
     application.save()  # 持久化所有变更字段
+    # 写入审核记录
+    AuditLog.objects.create(
+        application=application,
+        auditor=request.user,
+        audit_type=AuditLog.TYPE_CREDIT,
+        result="信审通过",
+        previous_status=previous_status,
+        new_status=Application.ST_ISSUED,
+        comment=f"虚拟发卡，卡号：{card_number}",
+    )
     messages.success(  # 成功提示并带上卡号便于核对
         request,  # 请求对象
         f"信审通过并完成虚拟发卡，卡号：{card_number}，可在申请详情中查看完整发卡信息。",  # 含卡号文案
@@ -127,10 +138,22 @@ def credit_reject_view(request, pk: int):  # 信审拒绝视图
     if request.method == "POST":  # 提交拒绝
         form = ReasonForm(request.POST)  # 绑定表单
         if form.is_valid():  # 校验
+            previous_status = application.status  # 记录操作前状态
+            comment = form.cleaned_data["reason"]  # 获取拒绝原因
             application.status = Application.ST_REJECTED  # 标记信审拒绝
-            application.credit_remark = form.cleaned_data["reason"]  # 保存拒绝说明
+            application.credit_remark = comment  # 保存拒绝说明
             application.credit_time = timezone.now()  # 写入处理时间
             application.save(update_fields=["status", "credit_remark", "credit_time", "updated_at"])  # 更新字段
+            # 写入审核记录
+            AuditLog.objects.create(
+                application=application,
+                auditor=request.user,
+                audit_type=AuditLog.TYPE_CREDIT,
+                result="信审拒绝",
+                previous_status=previous_status,
+                new_status=Application.ST_REJECTED,
+                comment=comment,
+            )
             messages.success(request, "已拒绝该申请")  # 提示
             return redirect("apply:credit_pending")  # 回列表
     else:  # GET

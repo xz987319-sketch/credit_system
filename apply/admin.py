@@ -496,17 +496,27 @@ class AuditLogAdmin(BankScopedMixin, ModelAdmin):
     """
 
     list_display = (
-        "id",           # 日志 ID
-        "application",  # 关联的申请单（显示申请单的 __str__，即 "#ID 申请人姓名"）
-        "auditor",      # 审批人（User 外键，显示用户名）
-        "result",       # 审核结果（通过/拒绝等）
-        "created_at",   # 记录创建时间
+        "id",              # 日志 ID
+        "application",     # 关联的申请单
+        "audit_type",      # 审核类型（初审/复审/信审）
+        "result",          # 审核结果（通过/拒绝/退回）
+        "previous_status", # 操作前状态
+        "new_status",      # 操作后状态
+        "auditor",         # 审批人
+        "created_at",      # 记录创建时间
     )
+
+    list_filter = (
+        ("audit_type"),     # 按审核类型筛选
+        ("result"),         # 按审核结果筛选
+        ("created_at"),     # 按时间筛选
+    )
+    # ^ 列表页筛选器：审核类型、审核结果、记录时间
 
     search_fields = ("result", "comment")
     # ^ 支持按审核结果和意见文本搜索
 
-    readonly_fields = ("application", "auditor", "result", "comment", "created_at")
+    readonly_fields = ("application", "auditor", "audit_type", "result", "previous_status", "new_status", "comment", "created_at")
     # ^ 所有字段设为只读：
     #   审计日志是操作历史记录，应当不可篡改，后台只用于查阅。
     #   设为 readonly_fields 后，表单中所有字段显示为文本（不可编辑）。

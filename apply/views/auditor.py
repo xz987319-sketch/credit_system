@@ -8,7 +8,7 @@ from django.utils import timezone  # 导入时区工具写入时间戳
 from django.views.decorators.http import require_http_methods, require_POST  # 导入方法限制装饰器
 
 from apply.forms import ReasonForm  # 导入原因表单
-from apply.models import Application, CardProduct  # 导入申请模型和卡产品模型
+from apply.models import Application, AuditLog, CardProduct  # 导入申请模型和卡产品模型
 from apply.utils.bank_scope import scope_by_bank  # 导入银行范围过滤
 from apply.views.access import can_access_application, can_access_auditor_functions  # 导入权限辅助
 from apply.models.form_config import FormPage  # 导入表单配置
@@ -130,9 +130,19 @@ def pending_first_pass_view(request, pk: int):  # 初审通过视图
     if application.status != Application.ST_PENDING_FIRST:  # 校验状态
         messages.warning(request, "状态已变化")  # 提示冲突
         return redirect("apply:pending_first")  # 回列表
+    previous_status = application.status  # 记录操作前状态
     application.status = Application.ST_PENDING_SECOND  # 更新为待复审
     application.init_audit_time = timezone.now()  # 写入初审通过时间
     application.save(update_fields=["status", "init_audit_time", "updated_at"])  # 保存字段子集
+    # 写入审核记录
+    AuditLog.objects.create(
+        application=application,
+        auditor=request.user,
+        audit_type=AuditLog.TYPE_FIRST,
+        result="初审通过",
+        previous_status=previous_status,
+        new_status=Application.ST_PENDING_SECOND,
+    )
     messages.success(request, "初审已通过")  # 成功提示
     return redirect("apply:pending_first")  # 返回列表
 
@@ -154,9 +164,21 @@ def pending_first_return_view(request, pk: int):  # 初审退回视图
     if request.method == "POST":  # 处理提交
         form = ReasonForm(request.POST)  # 绑定原因表单
         if form.is_valid():  # 校验原因
+            previous_status = application.status  # 记录操作前状态
+            comment = form.cleaned_data["reason"]  # 获取退回原因
             application.status = Application.ST_RETURNED  # 标记退回补充
-            application.return_reason = form.cleaned_data["reason"]  # 保存退回说明
+            application.return_reason = comment  # 保存退回说明
             application.save(update_fields=["status", "return_reason", "updated_at"])  # 持久化
+            # 写入审核记录
+            AuditLog.objects.create(
+                application=application,
+                auditor=request.user,
+                audit_type=AuditLog.TYPE_FIRST,
+                result="退回补充",
+                previous_status=previous_status,
+                new_status=Application.ST_RETURNED,
+                comment=comment,
+            )
             messages.success(request, "已退回补充资料")  # 提示成功
             return redirect("apply:pending_first")  # 回列表
     else:  # GET
@@ -224,9 +246,19 @@ def pending_second_pass_view(request, pk: int):  # 复审通过进入信审
     if application.status != Application.ST_PENDING_SECOND:  # 状态
         messages.warning(request, "状态已变化")  # 提示
         return redirect("apply:pending_second")  # 回列表
+    previous_status = application.status  # 记录操作前状态
     application.status = Application.ST_CREDIT_ING  # 进入信审
     application.second_audit_time = timezone.now()  # 记录复审通过时间
     application.save(update_fields=["status", "second_audit_time", "updated_at"])  # 保存
+    # 写入审核记录
+    AuditLog.objects.create(
+        application=application,
+        auditor=request.user,
+        audit_type=AuditLog.TYPE_SECOND,
+        result="复审通过",
+        previous_status=previous_status,
+        new_status=Application.ST_CREDIT_ING,
+    )
     messages.success(request, "复审已通过，已进入信审")  # 提示
     return redirect("apply:pending_second")  # 回列表
 
@@ -248,9 +280,21 @@ def pending_second_reject_view(request, pk: int):  # 复审拒绝视图
     if request.method == "POST":  # 提交
         form = ReasonForm(request.POST)  # 绑定
         if form.is_valid():  # 校验
+            previous_status = application.status  # 记录操作前状态
+            comment = form.cleaned_data["reason"]  # 获取拒绝原因
             application.status = Application.ST_SECOND_REJECT  # 复审拒绝终止
-            application.second_reject_reason = form.cleaned_data["reason"]  # 写入复审拒绝专用字段
+            application.second_reject_reason = comment  # 写入复审拒绝专用字段
             application.save(update_fields=["status", "second_reject_reason", "updated_at"])  # 保存
+            # 写入审核记录
+            AuditLog.objects.create(
+                application=application,
+                auditor=request.user,
+                audit_type=AuditLog.TYPE_SECOND,
+                result="复审拒绝",
+                previous_status=previous_status,
+                new_status=Application.ST_SECOND_REJECT,
+                comment=comment,
+            )
             messages.success(request, "已拒绝该申请")  # 提示
             return redirect("apply:pending_second")  # 回列表
     else:  # GET
