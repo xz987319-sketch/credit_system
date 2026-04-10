@@ -123,7 +123,7 @@ def check_duplicate_view(request):
 
 
 # 中文姓名转拼音函数（使用 pypinyin 库）
-def _chinese_to_pinyin(name):
+def chinese_to_pinyin(name):
     """将中文姓名转换为拼音（空格分隔，大写）。"""
     if not name:
         return ''
@@ -643,7 +643,7 @@ def multi_step_form_view(request, product_id):
                 name_field = next((f for f in page_fields if f.field_type == 'name' or f.validation_rule == 'name'), None)
                 if name_field:
                     name_value = request.POST.get(name_field.field_key, '').strip()
-                    page_data[field.field_key] = _chinese_to_pinyin(name_value)
+                    page_data[field.field_key] = chinese_to_pinyin(name_value)
                 else:
                     page_data[field.field_key] = ''
                 continue
@@ -887,7 +887,7 @@ def h5_multi_step_form_view(request, product_id):
                 name_field = next((f for f in page_fields if f.field_type == 'name' or f.validation_rule == 'name'), None)
                 if name_field:
                     name_value = request.POST.get(name_field.field_key, '').strip()
-                    page_data[field.field_key] = _chinese_to_pinyin(name_value)
+                    page_data[field.field_key] = chinese_to_pinyin(name_value)
                 else:
                     page_data[field.field_key] = ''
                 continue

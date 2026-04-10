@@ -552,10 +552,10 @@
                 .catch(function(err) {
                     // 如果是取消的请求，不做处理
                     if (err.name === 'AbortError') return;
-                    // 网络错误时不显示原汉字，留空让用户知道有问题
-                    console.log('[拼音H5] API请求异常');
-                    pinyinSpan.textContent = '';
-                    if (hiddenInput) hiddenInput.value = '';
+                    // API 请求异常，使用本地映射表作为后备（不会显示原汉字）
+                    console.log('[拼音H5] API请求异常，使用本地映射表后备');
+                    var localResult = chineseToPinyin(name);
+                    setPinyinValue(localResult);
                 });
         }
 
@@ -1106,10 +1106,23 @@
         (function() {
             var input = document.querySelector('input[name="{{ field.field_key }}"]');
             if (input) {
-                // 输入时过滤：只允许汉字和中间点(·)
-                input.addEventListener('input', function() {
+                var isComposing = false;  // 标记是否正在使用输入法
+                // 监听输入法输入状态
+                input.addEventListener('compositionstart', function() {
+                    isComposing = true;
+                });
+                input.addEventListener('compositionend', function() {
+                    isComposing = false;
+                    // 输入法输入完成后再过滤非汉字字符
                     this.value = this.value.replace(/[^\u4e00-\u9fff·]/g, '');
                     clearInvalid(this);
+                });
+                // 输入时过滤（输入法输入过程中跳过）
+                input.addEventListener('input', function() {
+                    if (!isComposing) {
+                        this.value = this.value.replace(/[^\u4e00-\u9fff·]/g, '');
+                        clearInvalid(this);
+                    }
                 });
                 // 失去焦点时校验
                 input.addEventListener('blur', function() { validateName(this); });
