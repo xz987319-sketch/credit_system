@@ -232,7 +232,8 @@
                                    value="{{ page_data|get_item:field.field_key }}"
                                    {% if not field.is_readonly and field.validation_rule == 'name' or "姓名" in field.field_label or "联系人姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
-                                   {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                                   {% if field.is_required and not field.is_readonly %}required{% endif %}
+                                   onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
                             <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'textarea' %}
                             <textarea class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -240,7 +241,8 @@
                                       name="{{ field.field_key }}"
                                       rows="3"
                                       {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
-                                      {% if field.is_required and not field.is_readonly %}required{% endif %}>{% if page_data %}{{ page_data|get_item:field.field_key }}{% endif %}</textarea>
+                                      {% if field.is_required and not field.is_readonly %}required{% endif %}
+                                      onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{% if page_data %}{{ page_data|get_item:field.field_key }}{% endif %}</textarea>
                             <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'number' %}
                             <input type="number"
@@ -288,10 +290,16 @@
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
                             <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'name_pinyin' %}
-                            <div class="form-control bg-light" style="overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;-webkit-user-select:text;min-height:38px;line-height:1.5;display:flex;align-items:center;">
-                                <span id="{{ field.field_key }}" name="{{ field.field_key }}" class="{% if not page_data|get_item:field.field_key %}text-muted{% endif %}">{{ page_data|get_item:field.field_key|default:'根据中文姓名自动生成' }}</span>
-                            </div>
-                            <input type="hidden" id="{{ field.field_key }}_hidden" name="{{ field.field_key }}" value="{{ page_data|get_item:field.field_key }}">
+                            <input type="text"
+                                   id="{{ field.field_key }}"
+                                   name="{{ field.field_key }}"
+                                   class="form-control bg-light"
+                                   style="overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;"
+                                   value="{{ page_data|get_item:field.field_key }}"
+                                   placeholder="根据中文姓名自动生成"
+                                   maxlength="100"
+                                   oninput="this.value = this.value.replace(/[^A-Z\s·]/g, '').toUpperCase()">
+                            <input type="hidden" id="{{ field.field_key }}_hidden" value="{{ page_data|get_item:field.field_key }}">
 
                         {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
                             <input type="text"
@@ -515,15 +523,15 @@
         var pinyinController = null;  // 用于取消上次请求的 AbortController
         function updatePinyinField(nameField, pinyinTargetId) {
             console.log('[拼音H5] updatePinyinField 调用，pinyinTargetId: ' + pinyinTargetId);
-            // 主字段：span 显示元素
-            var pinyinSpan = document.getElementById(pinyinTargetId);
-            console.log('[拼音H5] 通过ID查找拼音span: ' + (pinyinSpan ? '找到 ' + pinyinSpan.id : '未找到'));
+            // 主字段：input 显示元素
+            var pinyinInput = document.getElementById(pinyinTargetId);
+            console.log('[拼音H5] 通过ID查找拼音input: ' + (pinyinInput ? '找到 ' + pinyinInput.id : '未找到'));
             // 隐藏字段：用于表单提交
             var hiddenInput = document.getElementById(pinyinTargetId + '_hidden');
             console.log('[拼音H5] 查找对应hidden input: ' + (hiddenInput ? '找到 ' + hiddenInput.id : '未找到'));
 
-            if (!pinyinSpan || !nameField) {
-                console.log('[拼音H5] 拼音span或姓名字段为空，终止');
+            if (!pinyinInput || !nameField) {
+                console.log('[拼音H5] 拼音input或姓名字段为空，终止');
                 return;
             }
 
@@ -531,7 +539,7 @@
             console.log('[拼音H5] 姓名为: ' + name);
             if (!name) {
                 // 清空显示和隐藏字段
-                pinyinSpan.textContent = '';
+                pinyinInput.value = '';
                 if (hiddenInput) hiddenInput.value = '';
                 console.log('[拼音H5] 姓名为空，清空拼音字段');
                 return;
@@ -545,7 +553,7 @@
 
             // 统一的更新函数
             function setPinyinValue(pinyin) {
-                pinyinSpan.textContent = pinyin;  // 更新span显示
+                pinyinInput.value = pinyin;  // 更新input显示
                 if (hiddenInput) hiddenInput.value = pinyin;  // 更新hidden input用于提交
             }
 
@@ -1224,23 +1232,46 @@
             }
         });
 
-        // 姓名拼音绑定（只对 applicant_name 字段生效）
-        document.querySelectorAll('.name-source-field').forEach(function(nameField) {
+        // 姓名拼音绑定（只对 applicant_name 字段生效，支持用户手动修改）
+        (function() {
+            var nameField = document.getElementById('applicant_name');
+            if (!nameField) return;
             var pinyinTargetId = nameField.getAttribute('data-pinyin-target');
-            // 只对 applicant_name 字段绑定拼音转换
-            if (pinyinTargetId && nameField.id === 'applicant_name') {
-                nameField.addEventListener('input', function() {
-                    updatePinyinField(this, pinyinTargetId);
-                });
-                nameField.addEventListener('blur', function() {
-                    updatePinyinField(this, pinyinTargetId);
-                });
-                // 初始化（如果姓名字段已有值）
-                if (nameField.value) {
+            if (!pinyinTargetId) return;
+            var pinyinInput = document.getElementById(pinyinTargetId);
+            if (!pinyinInput) return;
+
+            var lastNameValue = '';  // 记录上次处理的姓名值
+            var userEditedPinyin = false;  // 标记用户是否手动编辑过拼音
+
+            // 用户手动编辑拼音时，设置标志
+            pinyinInput.addEventListener('input', function() {
+                userEditedPinyin = true;
+            });
+            pinyinInput.addEventListener('change', function() {
+                userEditedPinyin = true;
+            });
+
+            // 姓名字段变化时，检查是否需要自动更新拼音
+            function checkAndUpdatePinyin() {
+                var currentName = nameField.value.trim();
+                if (currentName !== lastNameValue) {
+                    // 姓名变了，重新自动更新
+                    lastNameValue = currentName;
+                    userEditedPinyin = false;  // 重置标志
                     updatePinyinField(nameField, pinyinTargetId);
                 }
             }
-        });
+
+            nameField.addEventListener('input', checkAndUpdatePinyin);
+            nameField.addEventListener('blur', checkAndUpdatePinyin);
+
+            // 初始化
+            if (nameField.value) {
+                lastNameValue = nameField.value.trim();
+                updatePinyinField(nameField, pinyinTargetId);
+            }
+        })();
 
         // 图片压缩并转 base64
         function compressAndConvert(file, callback) {

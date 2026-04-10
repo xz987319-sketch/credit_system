@@ -192,17 +192,18 @@
                                {% if not field.is_readonly and "姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                {% if not field.is_readonly and "联系人姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
-                               {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                               {% if field.is_required and not field.is_readonly %}required{% endif %}
+                               onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
 
                     {% elif field.field_type == 'name_pinyin' %}
                         <input type="text"
-                               class="form-control bg-light"
+                               class="form-control"
                                style="overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;"
                                id="{{ field.field_key }}"
                                name="{{ field.field_key }}"
                                value="{{ page_data|get_item:field.field_key|default:'' }}"
                                placeholder="根据中文姓名自动生成"
-                               readonly>
+                               maxlength="100">
 
                     {% elif field.field_type == 'textarea' %}
                         <textarea                                   class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -211,7 +212,8 @@
                                   rows="3"
                                   placeholder="{{ field.placeholder }}"
                                   {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
-                                  {% if field.is_required and not field.is_readonly %}required{% endif %}>{{ page_data|get_item:field.field_key|default:'' }}</textarea>
+                                  {% if field.is_required and not field.is_readonly %}required{% endif %}
+                                  onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{{ page_data|get_item:field.field_key|default:'' }}</textarea>
 
                     {% elif field.field_type == 'number' %}
                         <input type="number"
@@ -290,12 +292,14 @@
 
                     {% elif field.field_type == 'name_pinyin' %}
                         <input type="text"
-                               class="form-control bg-light"
+                               class="form-control"
                                id="{{ field.field_key }}"
                                name="{{ field.field_key }}"
                                value="{{ page_data|get_item:field.field_key|default:'' }}"
                                placeholder="根据姓名自动生成"
-                               {% if field.is_required %}required{% endif %}>
+                               maxlength="100"
+                               {% if field.is_required %}required{% endif %}
+                               oninput="this.value = this.value.replace(/[^A-Z\s·]/g, '').toUpperCase()">
 
 
                     {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}

@@ -111,7 +111,8 @@
                                            placeholder="{{ field.placeholder }}"
                                            {% if field.max_length %}maxlength="{{ field.max_length }}"{% endif %}
                                            {% if is_readonly_field %}readonly{% endif %}
-                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}
+                                           onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
                                     {% if errors and field.field_key in errors %}
                                     <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
                                     {% endif %}
@@ -123,7 +124,8 @@
                                               rows="3"
                                               placeholder="{{ field.placeholder }}"
                                               {% if is_readonly_field %}readonly{% endif %}
-                                              {% if field.is_required and not is_readonly_field %}required{% endif %}>{{ value|default:'' }}</textarea>
+                                              {% if field.is_required and not is_readonly_field %}required{% endif %}
+                                              onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{{ value|default:'' }}</textarea>
                                     {% if errors and field.field_key in errors %}
                                     <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
                                     {% endif %}
@@ -165,6 +167,19 @@
                                            maxlength="{{ field.max_length|default:'11' }}"
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
+
+                                {# 短信验证码：只读显示（H5提交上来的数据） #}
+                                {% elif field.field_type == 'sms_code' or field.field_key == 'Verification_code' %}
+                                    <input type="text"
+                                           class="form-control bg-light text-secondary"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'验证码' }}"
+                                           maxlength="6"
+                                           readonly>
                                     {% if errors and field.field_key in errors %}
                                     <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
                                     {% endif %}
@@ -213,11 +228,12 @@
                                 {# 姓名拼音 #}
                                 {% elif field.field_type == 'name_pinyin' %}
                                     <input type="text"
-                                           class="form-control bg-light text-secondary"
+                                           class="form-control"
                                            name="{{ field.field_key }}"
                                            value="{{ value|default:'' }}"
                                            placeholder="根据姓名自动生成"
-                                           readonly>
+                                           maxlength="100"
+                                           oninput="this.value = this.value.replace(/[^A-Z\s·]/g, '').toUpperCase()">
 
                                 {# 金额 #}
                                 {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
