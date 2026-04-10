@@ -13,6 +13,9 @@ from apply.utils.bank_scope import scope_by_bank  # 导入银行范围过滤
 from apply.views.access import can_access_application, can_access_auditor_functions  # 导入权限辅助
 from apply.models.form_config import FormPage  # 导入表单配置
 
+# 日志工具
+from apply.utils.logger import log_admin
+
 
 def _deny_if_not_qi(request):  # 定义内部函数处理无初审复审权限的访问
     """非超级管理员且非银行审核员则提示并重定向首页。"""  # 函数文档字符串
@@ -143,6 +146,20 @@ def pending_first_pass_view(request, pk: int):  # 初审通过视图
         previous_status=previous_status,
         new_status=Application.ST_PENDING_SECOND,
     )
+
+    # 记录后台操作日志
+    log_admin(
+        action='FIRST_PASS',
+        message=f'初审通过，申请人:{application.applicant_name}',
+        user_id=request.user.id,
+        user_name=request.user.username,
+        target_type='Application',
+        target_id=application.pk,
+        before_status=previous_status,
+        after_status=Application.ST_PENDING_SECOND,
+        request=request,
+    )
+
     messages.success(request, "初审已通过")  # 成功提示
     return redirect("apply:pending_first")  # 返回列表
 
@@ -179,6 +196,20 @@ def pending_first_return_view(request, pk: int):  # 初审退回视图
                 new_status=Application.ST_RETURNED,
                 comment=comment,
             )
+
+            # 记录后台操作日志
+            log_admin(
+                action='FIRST_REJECT',
+                message=f'初审退回，申请人:{application.applicant_name}，原因:{comment}',
+                user_id=request.user.id,
+                user_name=request.user.username,
+                target_type='Application',
+                target_id=application.pk,
+                before_status=previous_status,
+                after_status=Application.ST_RETURNED,
+                request=request,
+            )
+
             messages.success(request, "已退回补充资料")  # 提示成功
             return redirect("apply:pending_first")  # 回列表
     else:  # GET
@@ -259,6 +290,20 @@ def pending_second_pass_view(request, pk: int):  # 复审通过进入信审
         previous_status=previous_status,
         new_status=Application.ST_CREDIT_ING,
     )
+
+    # 记录后台操作日志
+    log_admin(
+        action='SECOND_PASS',
+        message=f'复审通过，申请人:{application.applicant_name}',
+        user_id=request.user.id,
+        user_name=request.user.username,
+        target_type='Application',
+        target_id=application.pk,
+        before_status=previous_status,
+        after_status=Application.ST_CREDIT_ING,
+        request=request,
+    )
+
     messages.success(request, "复审已通过，已进入信审")  # 提示
     return redirect("apply:pending_second")  # 回列表
 
@@ -295,6 +340,20 @@ def pending_second_reject_view(request, pk: int):  # 复审拒绝视图
                 new_status=Application.ST_SECOND_REJECT,
                 comment=comment,
             )
+
+            # 记录后台操作日志
+            log_admin(
+                action='SECOND_REJECT',
+                message=f'复审拒绝，申请人:{application.applicant_name}，原因:{comment}',
+                user_id=request.user.id,
+                user_name=request.user.username,
+                target_type='Application',
+                target_id=application.pk,
+                before_status=previous_status,
+                after_status=Application.ST_SECOND_REJECT,
+                request=request,
+            )
+
             messages.success(request, "已拒绝该申请")  # 提示
             return redirect("apply:pending_second")  # 回列表
     else:  # GET

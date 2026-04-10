@@ -26,6 +26,9 @@ from apply.utils.applicant_validate import (
 )
 from pypinyin import lazy_pinyin, Style
 
+# 日志工具
+from apply.utils.logger import log_apply
+
 
 # 姓氏多音字映射表（优先使用姓氏读音）
 SURNAME_POLYPHONOUS_MAP = {
@@ -749,6 +752,17 @@ def multi_step_form_view(request, product_id):
         if step > current_max:
             request.session['max_step_reached'] = step
 
+        # 记录进件流程日志 - 步骤切换
+        log_apply(
+            step_action='STEP_NEXT',
+            message=f'PC端填写第 {step + 1} 步完成，准备进入下一步' if not is_last else f'PC端填写第 {step + 1} 步完成，准备提交',
+            user_id=request.user.id if request.user.is_authenticated else None,
+            user_name=request.user.username if request.user.is_authenticated else 'anonymous',
+            app_id=None,
+            form_data={'step': step, 'is_last': is_last, 'product_id': product.pk},
+            request=request,
+        )
+
         # 如果是最后一步，保存Application
         if is_last:
             # 标记 Token 为已用，防止刷新重提
@@ -855,6 +869,17 @@ def _save_application(request, form_data, product, user_bank):
         amount=amount,
         status=Application.ST_PENDING_FIRST,
         form_data=form_data,  # 存储完整的动态表单数据
+    )
+
+    # 记录进件日志
+    log_apply(
+        step_action='SUBMIT',
+        message='PC端提交贷款申请成功',
+        user_id=request.user.id if request.user.is_authenticated else None,
+        user_name=request.user.username if request.user.is_authenticated else 'anonymous',
+        app_id=app.pk,
+        form_data=form_data,
+        request=request,
     )
 
     # 清除Session数据
@@ -1008,6 +1033,17 @@ def h5_multi_step_form_view(request, product_id):
         if step > current_max:
             request.session['max_step_reached'] = step
 
+        # 记录进件流程日志 - 步骤切换
+        log_apply(
+            step_action='STEP_NEXT',
+            message=f'H5端填写第 {step + 1} 步完成，准备进入下一步' if not is_last else f'H5端填写第 {step + 1} 步完成，准备提交',
+            user_id=request.user.id if request.user.is_authenticated else None,
+            user_name=request.user.username if request.user.is_authenticated else 'anonymous',
+            app_id=None,
+            form_data={'step': step, 'is_last': is_last, 'product_id': product.pk},
+            request=request,
+        )
+
         if is_last:
             # 标记 Token 为已用，防止刷新重提
             request.session['form_token_used'] = True
@@ -1103,6 +1139,17 @@ def _h5_save_application(request, form_data, product):
         amount=amount,
         status=Application.ST_PENDING_FIRST,
         form_data=form_data,
+    )
+
+    # 记录进件日志
+    log_apply(
+        step_action='SUBMIT',
+        message='H5端提交贷款申请成功',
+        user_id=request.user.id if request.user.is_authenticated else None,
+        user_name=request.user.username if request.user.is_authenticated else 'anonymous',
+        app_id=app.pk,
+        form_data=form_data,
+        request=request,
     )
 
     _clear_session_form_data(request)

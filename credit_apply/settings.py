@@ -91,6 +91,9 @@ USE_TZ = True  # 启用时区感知时间存储
 STATIC_URL = "static/"  # 浏览器访问静态文件时使用的 URL 前缀
 STATICFILES_DIRS = [BASE_DIR / "static"]  # 开发期额外静态文件搜索目录
 
+# 日志文件存储目录
+LOG_DIR = BASE_DIR / "logs"  # 日志文件存储目录（apply/utils/logger.py 使用）
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"  # 指定隐式主键默认使用大整型自增字段
 
 MESSAGE_TAGS = {message_constants.ERROR: "danger"}  # 将 Django error 消息映射为 Bootstrap 的 danger 样式类

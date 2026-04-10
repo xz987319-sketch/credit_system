@@ -11,6 +11,9 @@ from apply.forms import ReasonForm  # 导入原因表单
 from apply.models import Application, AuditLog, CardProduct  # 导入申请模型和卡产品模型
 from apply.models.form_config import FormPage  # 导入表单配置
 
+# 日志工具
+from apply.utils.logger import log_admin, log_issue
+
 
 def _deny_if_not_superuser(request):  # 内部超级用户校验
     """非超级管理员则提示并重定向首页。"""  # 文档字符串
@@ -117,6 +120,36 @@ def credit_pass_view(request, pk: int):  # 信审通过发卡
         new_status=Application.ST_ISSUED,
         comment=f"虚拟发卡，卡号：{card_number}",
     )
+
+    # 记录发卡信息日志（详细）
+    log_issue(
+        app_id=application.pk,
+        applicant_name=application.applicant_name,
+        id_card=application.id_card,
+        phone=application.phone,
+        bank_name=application.bank.bank_name,
+        product_name=application.card_product.product_name,
+        amount=str(application.amount),
+        issue_amount=str(application.amount),
+        issue_time=now.strftime('%Y-%m-%d %H:%M:%S'),
+        user_id=request.user.id,
+        user_name=request.user.username,
+        request=request,
+    )
+
+    # 记录后台操作日志
+    log_admin(
+        action='CREDIT_PASS_ISSUE',
+        message=f'信审通过并虚拟发卡，申请人:{application.applicant_name}，卡号:{card_number}',
+        user_id=request.user.id,
+        user_name=request.user.username,
+        target_type='Application',
+        target_id=application.pk,
+        before_status=previous_status,
+        after_status=Application.ST_ISSUED,
+        request=request,
+    )
+
     messages.success(  # 成功提示并带上卡号便于核对
         request,  # 请求对象
         f"信审通过并完成虚拟发卡，卡号：{card_number}，可在申请详情中查看完整发卡信息。",  # 含卡号文案
@@ -154,6 +187,20 @@ def credit_reject_view(request, pk: int):  # 信审拒绝视图
                 new_status=Application.ST_REJECTED,
                 comment=comment,
             )
+
+            # 记录后台操作日志
+            log_admin(
+                action='CREDIT_REJECT',
+                message=f'信审拒绝，申请人:{application.applicant_name}，原因:{comment}',
+                user_id=request.user.id,
+                user_name=request.user.username,
+                target_type='Application',
+                target_id=application.pk,
+                before_status=previous_status,
+                after_status=Application.ST_REJECTED,
+                request=request,
+            )
+
             messages.success(request, "已拒绝该申请")  # 提示
             return redirect("apply:credit_pending")  # 回列表
     else:  # GET
