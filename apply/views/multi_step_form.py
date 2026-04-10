@@ -384,6 +384,17 @@ def _validate_step_data(page_fields, post_data, product=None):
                 errors[field_key] = f'{field.field_label}为必填项'
             continue
 
+        # 文件字段：检查 base64 数据（与图片类似，但不压缩）
+        if field.field_type == 'file':
+            base64_value = post_data.get(field_key + '_base64', '')
+            if isinstance(base64_value, list):
+                base64_value = base64_value[0] if base64_value else ''
+            if base64_value:
+                base64_value = base64_value.strip()
+            if field.is_required and not base64_value:
+                errors[field_key] = f'{field.field_label}为必填项'
+            continue
+
         # 其他字段 - 统一处理成字符串
         if isinstance(field_value, list):
             # 列表字段（如多选）取第一个非空值
@@ -666,6 +677,17 @@ def multi_step_form_view(request, product_id):
                     page_data[field.field_key] = session_data.get(field.field_key, '')
                 continue
 
+            # 文件字段：优先使用 base64 数据（从隐藏字段）
+            if field.field_type == 'file':
+                base64_value = request.POST.get(field.field_key + '_base64', '').strip()
+                if base64_value:
+                    page_data[field.field_key] = base64_value
+                else:
+                    # 如果没有 base64，尝试获取已保存在 session 中的数据
+                    session_data = _get_session_form_data(request)
+                    page_data[field.field_key] = session_data.get(field.field_key, '')
+                continue
+
             field_value = request.POST.get(field.field_key, '').strip()
             page_data[field.field_key] = field_value
 
@@ -901,6 +923,17 @@ def h5_multi_step_form_view(request, product_id):
 
             # 图片字段：优先使用 base64 数据（从隐藏字段），否则使用上传的文件
             if field.field_type == 'image':
+                base64_value = request.POST.get(field.field_key + '_base64', '').strip()
+                if base64_value:
+                    page_data[field.field_key] = base64_value
+                else:
+                    # 如果没有 base64，尝试获取已保存在 session 中的数据
+                    session_data = _get_session_form_data(request)
+                    page_data[field.field_key] = session_data.get(field.field_key, '')
+                continue
+
+            # 文件字段：优先使用 base64 数据（从隐藏字段）
+            if field.field_type == 'file':
                 base64_value = request.POST.get(field.field_key + '_base64', '').strip()
                 if base64_value:
                     page_data[field.field_key] = base64_value

@@ -416,7 +416,7 @@ _PERM_MODEL_MAP = {
     "user":               "用户",
     "bank":               "银行",
     "card product":       "卡产品",
-    "credit application": "进件申请",
+    "credit application": "信贷申请",
     "menu item":          "菜单项",
     "apply":              "申请",
     "application":        "申请",

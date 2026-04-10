@@ -2,7 +2,7 @@
 from django.urls import path  # 导入 path
 
 from apply.views import apply_h5  # 导入 H5 视图
-from apply.views.multi_step_form import h5_multi_step_form_view, pinyin_convert_api  # 导入H5分步表单视图和拼音API
+from apply.views.multi_step_form import h5_multi_step_form_view, pinyin_convert_api, send_sms_code_api, verify_sms_code_api  # 导入H5分步表单视图和拼音API
 
 urlpatterns = [  # H5 路由列表
     # 银行大厅（多银行列表页）
@@ -28,4 +28,8 @@ urlpatterns = [  # H5 路由列表
     
     # 拼音转换API
     path("api/pinyin/", pinyin_convert_api, name="pinyin_convert"),  # /apply/api/pinyin/?name=张三
+
+    # 短信验证码API
+    path("api/sms/send/", send_sms_code_api, name="send_sms_code"),  # GET /apply/api/sms/send/?phone=13800138000
+    path("api/sms/verify/", verify_sms_code_api, name="verify_sms_code"),  # POST /apply/api/sms/verify/
 ]

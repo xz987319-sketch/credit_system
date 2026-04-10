@@ -189,7 +189,7 @@ UNFOLD = {  # Unfold 后台站点元信息与侧边栏分组配置
                 "separator": True,
                 "items": [
                     {
-                        "title": "进件申请",
+                        "title": "信贷申请",
                         "icon": "description",
                         "link": "/admin/apply/application/",
                         "permission": _make_menu_permission("biz_apply"),

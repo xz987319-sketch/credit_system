@@ -233,7 +233,7 @@
                                    {% if not field.is_readonly and field.validation_rule == 'name' or "姓名" in field.field_label or "联系人姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}
-                                   onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
+                                   onblur="this.value = this.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F2FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
                             <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'textarea' %}
                             <textarea class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
@@ -242,7 +242,7 @@
                                       rows="3"
                                       {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                       {% if field.is_required and not field.is_readonly %}required{% endif %}
-                                      onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{% if page_data %}{{ page_data|get_item:field.field_key }}{% endif %}</textarea>
+                                      onblur="this.value = this.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F2FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{% if page_data %}{{ page_data|get_item:field.field_key }}{% endif %}</textarea>
                             <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'number' %}
                             <input type="number"
@@ -285,7 +285,7 @@
                                    placeholder="{{ field.placeholder|default:'请输入18位身份证号' }}"
                                    maxlength="{{ field.max_length|default:'18' }}"
                                    data-is-idcard="true"
-                                   {% if not field.is_readonly %}oninput="this.value=this.value.replace(/x/g,'X')" onblur="parseIdCard(this)"{% endif %}
+                                   {% if not field.is_readonly %}oninput="this.value=this.value.replace(/[^0-9Xx]/g,'').replace(/x/g,'X')" onblur="parseIdCard(this)"{% endif %}
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
                             <div class="invalid-feedback"></div>
@@ -298,7 +298,7 @@
                                    value="{{ page_data|get_item:field.field_key }}"
                                    placeholder="根据中文姓名自动生成"
                                    maxlength="100"
-                                   oninput="this.value = this.value.replace(/[^A-Z\s·]/g, '').toUpperCase()">
+                                   oninput="this.value = this.value.replace(/[^A-Za-z\s·]/g, '').toUpperCase()">
                             <input type="hidden" id="{{ field.field_key }}_hidden" value="{{ page_data|get_item:field.field_key }}">
 
                         {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
@@ -377,11 +377,40 @@
                                 {% endwith %}
                             </div>
                         {% elif field.field_type == 'file' %}
+                            <!-- 文件预览/下载区域 -->
+                            <div class="file-preview-container mb-2" id="{{ field.field_key }}_preview_container">
+                                {% with file_data=page_data|get_item:field.field_key %}
+                                {% if file_data %}
+                                    {% if file_data|slice:":5" == "data:" %}
+                                        {# Base64 文件：提取文件名并显示下载按钮 #}
+                                        {% with file_name=field.field_label|add:"_文件" %}
+                                        <div class="alert alert-info py-2 px-3 mb-0">
+                                            <i class="bi bi-file-earmark me-1"></i>已有文件上传
+                                            <a href="{{ file_data }}" download="{{ file_name }}" class="btn btn-sm btn-outline-primary ms-2">
+                                                <i class="bi bi-download me-1"></i>下载查看
+                                            </a>
+                                        </div>
+                                        {% endwith %}
+                                    {% else %}
+                                        {# 旧数据（文件名） #}
+                                        <div class="alert alert-warning py-2 px-3 mb-0">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>文件: {{ file_data }}
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                                {% endwith %}
+                            </div>
+                            <!-- 隐藏的 base64 存储字段 -->
+                            <input type="hidden" name="{{ field.field_key }}_base64" id="{{ field.field_key }}_base64" value="{{ page_data|get_item:field.field_key }}">
+                            <!-- 文件选择 -->
                             <input type="file"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %}"
                                    id="{{ field.field_key }}"
                                    name="{{ field.field_key }}"
+                                   onchange="handleFileSelect(this, '{{ field.field_key }}_preview_container', '{{ field.field_key }}_base64', '{{ field.field_key }}_filename')"
                                    {% if field.is_required %}required{% endif %}>
+                            <!-- 文件名显示 -->
+                            <div class="small text-muted mt-1" id="{{ field.field_key }}_filename"></div>
                         {% elif field.field_type == 'image' %}
                             <!-- 图片预览区域 -->
                             <div class="image-preview-container mb-2" id="{{ field.field_key }}_preview_container">
@@ -1319,6 +1348,44 @@
                     tryCompress();
                 };
                 img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 文件选择处理：转 base64 存储（不压缩，适用于 PDF、Excel 等）
+        function handleFileSelect(input, previewContainerId, base64InputId, filenameId) {
+            var file = input.files[0];
+            var previewContainer = document.getElementById(previewContainerId);
+            var base64Input = document.getElementById(base64InputId);
+            var filenameEl = filenameId ? document.getElementById(filenameId) : null;
+
+            if (!file) return;
+
+            // 文件大小限制 10MB
+            if (file.size > 10 * 1024 * 1024) {
+                alert('文件大小不能超过 10MB');
+                input.value = '';
+                return;
+            }
+
+            // 显示文件名
+            var displayName = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
+            if (filenameEl) filenameEl.textContent = displayName;
+
+            // 显示处理中
+            previewContainer.innerHTML = '<div class="text-muted small py-2"><span class="spinner-border spinner-border-sm me-1"></span>文件处理中...</div>';
+
+            // 读取文件为 base64
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var base64 = e.target.result;
+                // 存储 base64 到隐藏字段
+                base64Input.value = base64;
+                // 显示已选择文件
+                previewContainer.innerHTML = '<div class="alert alert-info py-2 px-3 mb-0"><i class="bi bi-file-earmark me-1"></i>' + displayName + ' <span class="text-success ms-2">✓ 已选择</span></div>';
+            };
+            reader.onerror = function() {
+                previewContainer.innerHTML = '<div class="alert alert-danger py-2 px-3 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>文件读取失败</div>';
             };
             reader.readAsDataURL(file);
         }

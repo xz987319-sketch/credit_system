@@ -193,7 +193,7 @@
                                {% if not field.is_readonly and "联系人姓名" in field.field_label %}data-pinyin-target="{{ field.field_key }}_pinyin"{% endif %}
                                {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}
-                               onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
+                               onblur="this.value = this.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F2FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
 
                     {% elif field.field_type == 'name_pinyin' %}
                         <input type="text"
@@ -213,7 +213,7 @@
                                   placeholder="{{ field.placeholder }}"
                                   {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                   {% if field.is_required and not field.is_readonly %}required{% endif %}
-                                  onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{{ page_data|get_item:field.field_key|default:'' }}</textarea>
+                                  onblur="this.value = this.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F2FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{{ page_data|get_item:field.field_key|default:'' }}</textarea>
 
                     {% elif field.field_type == 'number' %}
                         <input type="number"
@@ -272,7 +272,7 @@
                                placeholder="{{ field.placeholder|default:'请输入18位身份证号' }}"
                                maxlength="{{ field.max_length|default:'18' }}"
                                data-is-idcard="true"
-                               {% if not field.is_readonly %}oninput="this.value=this.value.replace(/x/g,'X')" onblur="parseIdCard(this)"{% endif %}
+                               {% if not field.is_readonly %}oninput="this.value=this.value.replace(/[^0-9Xx]/g,'').replace(/x/g,'X')" onblur="parseIdCard(this)"{% endif %}
                                {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
 
@@ -299,7 +299,7 @@
                                placeholder="根据姓名自动生成"
                                maxlength="100"
                                {% if field.is_required %}required{% endif %}
-                               oninput="this.value = this.value.replace(/[^A-Z\s·]/g, '').toUpperCase()">
+                               oninput="this.value = this.value.replace(/[^A-Za-z\s·]/g, '').toUpperCase()">
 
 
                     {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
@@ -365,12 +365,28 @@
                         </div>
 
                     {% elif field.field_type == 'file' %}
-                        <!-- 文件类型也支持图片预览（值是base64图片时显示） -->
-                        <div class="image-preview-container mb-2" id="{{ field.field_key }}_preview_container">
-                            {% with base64_data=page_data|get_item:field.field_key %}
-                            {% if base64_data and base64_data|slice:":22" == "data:image" %}
-                                <img src="{{ base64_data }}" class="img-thumbnail" style="max-width: 200px; max-height: 150px;">
-                                <p class="small text-muted">已有图片，如需更换请重新选择</p>
+                        <!-- 文件预览/下载区域 -->
+                        <div class="file-preview-container mb-2" id="{{ field.field_key }}_preview_container">
+                            {% with file_data=page_data|get_item:field.field_key %}
+                            {% if file_data %}
+                                {% if file_data|slice:":5" == "data:" %}
+                                    {# Base64 文件：判断是图片还是其他文件 #}
+                                    {% if file_data|slice:":10" == "data:image" %}
+                                        <img src="{{ file_data }}" class="img-thumbnail" style="max-width: 200px; max-height: 150px;">
+                                        <p class="small text-muted">已有图片，如需更换请重新选择</p>
+                                    {% else %}
+                                        <a href="{{ file_data }}" download="{{ field.field_label }}_文件" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-download me-1"></i>下载已有文件
+                                        </a>
+                                        <span class="text-muted small ms-2">如需更换请重新选择</span>
+                                    {% endif %}
+                                {% else %}
+                                    {# 旧数据（只有文件名） #}
+                                    <div class="alert alert-warning py-2 px-3 mb-0">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        原文件 "{{ file_data }}" 无法直接下载，如需保留请重新上传
+                                    </div>
+                                {% endif %}
                             {% endif %}
                             {% endwith %}
                         </div>
@@ -381,8 +397,7 @@
                                class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
                                id="{{ field.field_key }}"
                                name="{{ field.field_key }}"
-                               accept="image/*"
-                               onchange="handleImageSelect(this, '{{ field.field_key }}_preview_container', '{{ field.field_key }}_base64')"
+                               onchange="handleFileSelect(this, '{{ field.field_key }}_preview_container', '{{ field.field_key }}_base64')"
                                {% if field.is_readonly %}disabled{% endif %}
                                {% if field.is_required and not field.is_readonly %}required{% endif %}>
 
@@ -1173,6 +1188,36 @@
             }
         });
     })();
+
+    // 文件选择处理：将文件转为 base64 并存储（不压缩，适用于 PDF、Excel 等）
+    function handleFileSelect(input, previewContainerId, base64InputId) {
+        var file = input.files[0];
+        var previewContainer = document.getElementById(previewContainerId);
+        var base64Input = document.getElementById(base64InputId);
+
+        if (!file) return;
+
+        // 限制文件大小 10MB
+        if (file.size > 10 * 1024 * 1024) {
+            alert('文件大小不能超过 10MB');
+            input.value = '';
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var base64 = e.target.result;
+            // 存储 base64
+            base64Input.value = base64;
+            // 根据文件类型显示预览或下载链接
+            if (file.type.startsWith('image/')) {
+                previewContainer.innerHTML = '<img src="' + base64 + '" class="img-thumbnail" style="max-width: 200px; max-height: 150px;"><p class="small text-muted">已选择新图片: ' + file.name + '</p>';
+            } else {
+                previewContainer.innerHTML = '<div class="alert alert-info py-2 px-3 mb-0"><i class="bi bi-file-earmark me-1"></i>' + file.name + ' <span class="text-success ms-2">✓ 已选择</span></div>';
+            }
+        };
+        reader.readAsDataURL(file);
+    }
 
     // 图片选择处理：将图片转为 base64 并存储
     function handleImageSelect(input, previewContainerId, base64InputId) {

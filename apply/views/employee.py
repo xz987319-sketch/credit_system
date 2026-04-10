@@ -599,7 +599,13 @@ def return_edit_view(request, pk: int):  # 定义退回补充编辑视图
                     
                     # 从 POST 获取动态字段值
                     field_value = request.POST.get(field.field_key)
-                    
+
+                    # 文件字段：如果没有上传新文件，保留原文件
+                    if field.field_type == 'file' and not field_value:
+                        original_value = request.POST.get(f'{field.field_key}_original')
+                        if original_value:
+                            field_value = original_value
+
                     # 如果是只读字段（下拉框、单选框、复选框disabled后值不提交），从原有数据恢复
                     if is_basic_readonly and not field_value:
                         field_value = dynamic_data.get(field.field_key)

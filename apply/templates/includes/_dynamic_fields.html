@@ -51,6 +51,23 @@
                                     <div class="form-control bg-light text-muted">—</div>
                                     {% endif %}
 
+                                {# 文件下载链接 #}
+                                {% elif field.field_type == 'file' and value %}
+                                    {% if value|slice:":5" == "data:" %}
+                                        {# Base64 格式：直接下载 #}
+                                        <div>
+                                            <a href="{{ value }}" download="{{ field.field_label }}_文件" class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-download me-1"></i>下载 {{ field.field_label }}
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        {# 旧数据（只有文件名）：提示需重新上传 #}
+                                        <div class="alert alert-warning py-2 px-3 mb-0">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            原文件 "{{ value }}" 无法直接下载，请重新上传
+                                        </div>
+                                    {% endif %}
+
                                 {# 长文本 #}
                                 {% elif field.field_type == 'textarea' or value|length > 100 %}
                                     <div class="form-control bg-light text-dark" style="min-height: 60px; overflow-y: auto;" readonly>{{ value|default:"—" }}</div>
@@ -112,7 +129,7 @@
                                            {% if field.max_length %}maxlength="{{ field.max_length }}"{% endif %}
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}
-                                           onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
+                                           onblur="this.value = this.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F2FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">
                                     {% if errors and field.field_key in errors %}
                                     <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
                                     {% endif %}
@@ -125,7 +142,7 @@
                                               placeholder="{{ field.placeholder }}"
                                               {% if is_readonly_field %}readonly{% endif %}
                                               {% if field.is_required and not is_readonly_field %}required{% endif %}
-                                              onblur="this.value = this.value.replace(/[\s\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{{ value|default:'' }}</textarea>
+                                              onblur="this.value = this.value.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F2FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')">{{ value|default:'' }}</textarea>
                                     {% if errors and field.field_key in errors %}
                                     <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
                                     {% endif %}
@@ -205,6 +222,7 @@
                                            value="{{ value|default:'' }}"
                                            placeholder="{{ field.placeholder|default:'请输入18位身份证号' }}"
                                            maxlength="{{ field.max_length|default:'18' }}"
+                                           {% if not is_readonly_field %}oninput="this.value=this.value.replace(/[^0-9Xx]/g,'').replace(/x/g,'X')"{% endif %}
                                            {% if is_readonly_field %}readonly{% endif %}
                                            {% if field.is_required and not is_readonly_field %}required{% endif %}>
                                     {% if errors and field.field_key in errors %}
@@ -233,7 +251,7 @@
                                            value="{{ value|default:'' }}"
                                            placeholder="根据姓名自动生成"
                                            maxlength="100"
-                                           oninput="this.value = this.value.replace(/[^A-Z\s·]/g, '').toUpperCase()">
+                                           oninput="this.value = this.value.replace(/[^A-Za-z\s·]/g, '').toUpperCase()">
 
                                 {# 金额 #}
                                 {% elif field.field_type == 'amount' or field.validation_rule == 'amount_range' %}
@@ -328,15 +346,30 @@
 
                                 {# 文件上传 #}
                                 {% elif field.field_type == 'file' %}
-                                    {# 只读时添加隐藏字段保存值 #}
-                                    {% if is_readonly_field and value %}
-                                    <input type="hidden" name="{{ field.field_key }}" value="{{ value }}">
+                                    {# 已有文件：显示下载链接 + 隐藏字段保留原值 #}
+                                    {% if value %}
+                                        {% if value|slice:":5" == "data:" %}
+                                            {# Base64 格式文件：显示下载链接 #}
+                                            <div class="mb-2">
+                                                <a href="{{ value }}" download="{{ field.field_label }}_文件" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-download me-1"></i>下载已有文件
+                                                </a>
+                                                <span class="text-muted small ms-2">如需更换请重新选择新文件</span>
+                                            </div>
+                                            <input type="hidden" name="{{ field.field_key }}_base64" value="{{ value }}">
+                                        {% else %}
+                                            {# 旧数据（只有文件名）：提示需重新上传 #}
+                                            <div class="alert alert-warning py-2 px-3 mb-2">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                                原文件 "{{ value }}" 无法直接下载，如需保留请重新上传
+                                            </div>
+                                        {% endif %}
                                     {% endif %}
                                     <input type="file"
                                            class="form-control"
                                            name="{{ field.field_key }}"
                                            {% if is_readonly_field %}disabled{% endif %}
-                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                           {% if field.is_required and not value and not is_readonly_field %}required{% endif %}>
                                     {% if errors and field.field_key in errors %}
                                     <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
                                     {% endif %}

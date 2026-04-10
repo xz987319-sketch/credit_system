@@ -144,6 +144,20 @@
 {# ====== 发卡数据比对 ====== #}
 {% if compare_rows %}
 <h2 class="h6 mt-4"><i class="bi bi-arrow-left-right me-1"></i>发卡数据比对</h2>
+
+{# ====== 比对结果提示 ====== #}
+{% if compare_has_mismatch %}
+<div class="alert alert-danger mb-3">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+    <strong>数据比对结果：不一致</strong>，有 {{ compare_mismatch_count }} 个字段与原始申请不符，请查看下方高亮字段
+</div>
+{% else %}
+<div class="alert alert-success mb-3">
+    <i class="bi bi-check-circle-fill me-1"></i>
+    <strong>数据比对结果：一致</strong>，所有数据无异常
+</div>
+{% endif %}
+
 <div class="table-responsive">
 <table class="table table-bordered table-sm">
     <thead>

@@ -66,6 +66,7 @@ class FormField(models.Model):
         ("name", "姓名"),
         ("name_pinyin", "姓名拼音"),
         ("amount", "申请金额"),
+        ("sms_code", "短信验证码"),
     ]
 
     VALIDATION_RULE_CHOICES = [

@@ -92,6 +92,9 @@ class BankAdmin(BankScopedMixin, ModelAdmin):
     #   列表页列标题旁的⊗和数字是排序优先级指示器，由模型 Meta.ordering 触发，
     #   与 list_filter 无关，通过 CSS 统一隐藏（见 static/admin_custom.css）。
 
+    change_list_template = "admin/apply/bank/change_list.html"
+    # ^ 自定义模板：Filters 按钮中文
+
     # ── 品牌色 hex → 中文名映射 ──────────────────────────────────────
     COLOR_NAME_MAP = {
         "#e74c3c": "红色", "#c0392b": "深红色", "#e91e63": "粉红色",
@@ -218,6 +221,9 @@ class UserAdmin(BankScopedMixin, DjangoUserAdmin, ModelAdmin):
 
     list_filter = ("role", "is_staff", "is_superuser")
     # ^ 右侧筛选器面板的字段，点击可按角色/权限类型过滤用户列表
+
+    change_list_template = "admin/apply/user/change_list.html"
+    # ^ 自定义模板：Filters 按钮中文
 
     search_fields = ("username", "email")
     # ^ 搜索框支持按用户名或邮箱关键字搜索
@@ -406,6 +412,9 @@ class CardProductAdmin(BankScopedMixin, ModelAdmin):
     #   bank      — 按银行过滤（超管可见所有银行；普通员工因列表已过滤，
     #               此处只会显示本行，但显式保留以防 Mixin 过滤失效时的二次保障）
 
+    change_list_template = "admin/apply/cardproduct/change_list.html"
+    # ^ 自定义模板：Filters 按钮中文
+
     search_fields = ("product_name", "product_type")
     # ^ 支持按产品名称和产品类型关键字搜索
 
@@ -431,8 +440,11 @@ class ApplicationAdmin(BankScopedMixin, ModelAdmin):
     list_display = (
         "id",             # 申请 ID（主键）
         "applicant_name", # 申请人姓名
+        "id_card",        # 证件号码
+        "phone",          # 手机号
         "bank",           # 所属银行
         "status",         # 当前状态（choices 会显示中文，如"待初审""已发卡"）
+        "return_reason",  # 退回原因
         "amount",         # 申请额度（元）
         "created_at",     # 申请提交时间
     )
@@ -440,8 +452,17 @@ class ApplicationAdmin(BankScopedMixin, ModelAdmin):
     list_filter = ("status", "bank")
     # ^ 按状态和银行过滤，帮助管理员快速找到特定状态的申请
 
+    list_editable = ("status",)
+    # ^ 超级管理员可在列表页直接修改申请状态（兜底操作）
+
     search_fields = ("applicant_name", "id_card", "phone")
-    # ^ 支持按申请人姓名、身份证号、手机号搜索
+    # ^ 支持按申请人姓名、证件号码、手机号搜索
+
+    search_help_text = "搜索申请人姓名、证件号码或手机号"
+    # ^ 搜索框提示文字
+
+    # 自定义模板：覆盖 Filters 按钮为中文
+    change_list_template = "admin/apply/application/change_list.html"
 
     readonly_fields = ("created_at", "updated_at", "issue_data")
     # ^ 设为只读的字段：
@@ -500,8 +521,9 @@ class AuditLogAdmin(BankScopedMixin, ModelAdmin):
         "application",     # 关联的申请单
         "audit_type",      # 审核类型（初审/复审/信审）
         "result",          # 审核结果（通过/拒绝/退回）
-        "previous_status", # 操作前状态
-        "new_status",      # 操作后状态
+        "previous_status_display",  # 操作前状态（中文）
+        "new_status_display",      # 操作后状态（中文）
+        "comment",         # 备注说明
         "auditor",         # 审批人
         "created_at",      # 记录创建时间
     )
@@ -513,13 +535,35 @@ class AuditLogAdmin(BankScopedMixin, ModelAdmin):
     )
     # ^ 列表页筛选器：审核类型、审核结果、记录时间
 
-    search_fields = ("result", "comment")
-    # ^ 支持按审核结果和意见文本搜索
+    search_fields = (
+        "result",             # 审核结果
+        "comment",            # 审核意见
+        "application__applicant_name",  # 申请人姓名
+        "auditor__username",  # 审批人
+    )
+
+    # 搜索说明文字
+    search_help_text = "搜索申请人、审批人、审核结果或意见"
+
+    # 自定义模板：覆盖 Filters 按钮为中文
+    change_list_template = "admin/apply/auditlog/change_list.html"
 
     readonly_fields = ("application", "auditor", "audit_type", "result", "previous_status", "new_status", "comment", "created_at")
     # ^ 所有字段设为只读：
     #   审计日志是操作历史记录，应当不可篡改，后台只用于查阅。
     #   设为 readonly_fields 后，表单中所有字段显示为文本（不可编辑）。
+
+    def previous_status_display(self, obj):
+        """显示操作前状态的中文名称"""
+        status_map = dict(Application.STATUS_CHOICES)
+        return status_map.get(obj.previous_status, obj.previous_status or "—")
+    previous_status_display.short_description = "操作前状态"
+
+    def new_status_display(self, obj):
+        """显示操作后状态的中文名称"""
+        status_map = dict(Application.STATUS_CHOICES)
+        return status_map.get(obj.new_status, obj.new_status or "—")
+    new_status_display.short_description = "操作后状态"
 
     def get_queryset(self, request):
         """
@@ -690,6 +734,8 @@ class FormFieldAdmin(ModelAdmin):
     list_display = ("page", "field_label", "field_key", "field_type", "validation_rule", "is_required", "is_readonly", "sort_order", "max_length", "is_active")
     list_display_links = ("page", "field_label")
     list_filter = ("page", "field_type", "validation_rule", "is_required", "is_readonly", "is_active")
+    change_list_template = "admin/apply/formfield/change_list.html"
+    # ^ 自定义模板：Filters 按钮中文
     search_fields = ("field_label", "field_key")
     ordering = ("page__order", "sort_order")
     list_editable = ("field_key", "field_type", "validation_rule", "is_required", "is_readonly", "sort_order", "max_length")
