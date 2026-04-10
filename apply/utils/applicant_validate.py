@@ -81,3 +81,17 @@ def clean_cn_mobile(value: str) -> str:
     if not CN_MOBILE_PATTERN.fullmatch(digits):  # 匹配号段规则
         raise ValidationError("请输入有效的 11 位中国大陆手机号码")
     return digits  # 返回手机号
+
+
+# 电子邮箱：用户名@域名.后缀，支持英文、数字、点、下划线、连字符、加号
+EMAIL_PATTERN = re.compile(
+    r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+)
+
+
+def clean_email(value: str) -> str:
+    """校验电子邮箱格式。"""
+    text = (value or "").strip()
+    if not EMAIL_PATTERN.fullmatch(text):
+        raise ValidationError("请输入有效的电子邮箱地址")
+    return text

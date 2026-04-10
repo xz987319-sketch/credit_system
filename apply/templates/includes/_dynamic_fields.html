@@ -169,6 +169,19 @@
                                     <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
                                     {% endif %}
 
+                                {# 电子邮箱 #}
+                                {% elif field.field_type == 'email' or field.validation_rule == 'email' %}
+                                    <input type="email"
+                                           class="form-control{% if is_readonly_field %} bg-light text-secondary{% endif %}"
+                                           name="{{ field.field_key }}"
+                                           value="{{ value|default:'' }}"
+                                           placeholder="{{ field.placeholder|default:'请输入邮箱' }}"
+                                           {% if is_readonly_field %}readonly{% endif %}
+                                           {% if field.is_required and not is_readonly_field %}required{% endif %}>
+                                    {% if errors and field.field_key in errors %}
+                                    <div class="text-danger small mt-1">{{ errors|get_item:field.field_key }}</div>
+                                    {% endif %}
+
                                 {# 身份证号 #}
                                 {% elif field.field_type == 'id_card' or field.validation_rule == 'id_card' %}
                                     <input type="text"

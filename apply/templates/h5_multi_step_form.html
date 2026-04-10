@@ -262,6 +262,16 @@
                                    {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
                                    {% if field.is_required and not field.is_readonly %}required{% endif %}>
                             <div class="invalid-feedback"></div>
+                        {% elif field.field_type == 'email' or field.validation_rule == 'email' %}
+                            <input type="email"
+                                   class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"
+                                   id="{{ field.field_key }}"
+                                   name="{{ field.field_key }}"
+                                   value="{{ page_data|get_item:field.field_key }}"
+                                   placeholder="{{ field.placeholder|default:'请输入邮箱' }}"
+                                   {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
+                                   {% if field.is_required and not field.is_readonly %}required{% endif %}>
+                            <div class="invalid-feedback"></div>
                         {% elif field.field_type == 'id_card' or field.validation_rule == 'id_card' %}
                             <input type="text"
                                    class="form-control {% if field.field_key in errors %}is-invalid{% endif %} {% if field.is_readonly %}bg-light text-secondary{% endif %}"

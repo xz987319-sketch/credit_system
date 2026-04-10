@@ -74,6 +74,7 @@ class FormField(models.Model):
         ("id_card", "身份证号校验"),
         ("phone", "手机号校验"),
         ("amount_range", "金额区间校验"),
+        ("email", "邮箱校验"),
     ]
 
     page = models.ForeignKey(

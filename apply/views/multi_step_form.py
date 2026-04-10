@@ -443,6 +443,13 @@ def _validate_step_data(page_fields, post_data, product=None):
             except Exception as e:
                 errors[field_key] = str(e)
 
+        elif validation_rule == 'email':
+            try:
+                from apply.utils.applicant_validate import clean_email
+                clean_email(str_value)
+            except Exception as e:
+                errors[field_key] = str(e)
+
         elif validation_rule == 'amount_range':
             try:
                 from decimal import Decimal
