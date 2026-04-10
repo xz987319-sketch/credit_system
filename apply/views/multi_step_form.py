@@ -192,7 +192,12 @@ def send_sms_code_api(request):
     # 生成6位验证码
     code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
 
-    # 存入session，key包含时间戳用于60秒限制
+    # 存入session前先清空旧数据，确保不残留
+    request.session.pop('sms_code', None)
+    request.session.pop('sms_code_phone', None)
+    request.session.pop('sms_code_time', None)
+
+    # 存入session
     request.session['sms_code'] = code
     request.session['sms_code_phone'] = phone
     request.session['sms_code_time'] = int(time.time())
@@ -225,19 +230,36 @@ def verify_sms_code_api(request):
     session_phone = request.session.get('sms_code_phone', '')
     session_time = request.session.get('sms_code_time', 0)
 
-    # 校验手机号一致性
+    print(f"[DEBUG] 验证码校验 | 请求phone={phone}, code={code} | session_code={repr(session_code)}, session_phone={repr(session_phone)}, session_time={session_time}", flush=True)
+
+    # ===== 1. 判断是否发送过验证码 =====
+    if not session_code:
+        print("[DEBUG] 验证码校验 | step1: session_code为空，返回'请先获取验证码'", flush=True)
+        return JsonResponse({'success': False, 'message': '请先获取验证码'})
+
+    # ===== 2. 校验手机号一致性 =====
     if session_phone != phone:
+        print(f"[DEBUG] 验证码校验 | step2: 手机号不一致 | session_phone={repr(session_phone)} != phone={repr(phone)}")
+        # 清除旧session，让用户重新获取
+        request.session.pop('sms_code', None)
+        request.session.pop('sms_code_phone', None)
+        request.session.pop('sms_code_time', None)
         return JsonResponse({'success': False, 'message': '手机号不一致，请重新获取验证码'})
 
-    # 校验验证码
-    if session_code != code:
-        return JsonResponse({'success': False, 'message': '验证码错误'})
-
-    # 校验是否过期（5分钟有效期）
-    if int(time.time()) - session_time > 300:
+    # ===== 3. 校验是否过期（1分钟有效期）=====
+    elapsed = int(time.time()) - session_time
+    if elapsed > 60:
+        print(f"[DEBUG] 验证码校验 | step3: 验证码已过期 | elapsed={elapsed}s > 60s")
+        # 不清session，用户再输入同样的过期码仍提示"已过期"
         return JsonResponse({'success': False, 'message': '验证码已过期，请重新获取'})
 
-    # 验证成功后清除验证码（防止重复使用）
+    # ===== 4. 校验验证码是否正确 =====
+    if session_code != code:
+        print(f"[DEBUG] 验证码校验 | step4: 验证码错误 | session_code={repr(session_code)} != code={repr(code)}")
+        # 不清session，用户可在有效期内继续尝试
+        return JsonResponse({'success': False, 'message': '验证码错误'})
+
+    # ===== 5. 验证成功后清除验证码（防止重复使用） =====
     request.session.pop('sms_code', None)
     request.session.pop('sms_code_phone', None)
     request.session.pop('sms_code_time', None)
@@ -777,6 +799,11 @@ def h5_multi_step_form_view(request, product_id):
     # 获取卡产品
     products_qs = CardProduct.objects.filter(is_active=True)
     product = get_object_or_404(products_qs, pk=product_id)
+
+    # 重新进入表单时，清空旧的验证码session
+    request.session.pop('sms_code', None)
+    request.session.pop('sms_code_phone', None)
+    request.session.pop('sms_code_time', None)
 
     # 获取所有表单页面
     form_pages = _get_form_pages()

@@ -208,7 +208,8 @@
                                            maxlength="6"
                                            data-is-sms-code="true"
                                            {% if field.is_readonly %}readonly style="cursor:not-allowed;opacity:0.8"{% endif %}
-                                           {% if field.is_required and not field.is_readonly %}data-sms-required="true"{% endif %}>
+                                           {% if field.is_required and not field.is_readonly %}data-sms-required="true"{% endif %}
+                                           oninput="this.value=this.value.replace(/[^0-9]/g,'')">
                                     <div class="invalid-feedback"></div>
                                 </div>
                                 <button type="button"
@@ -833,23 +834,36 @@
                     var phone = phoneInput ? phoneInput.value.trim() : '';
                     
                     // 调用后端校验API
-                    var verifyResult = await fetch('/apply/api/sms/verify/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'X-CSRFToken': getCsrfToken()
-                        },
-                        body: 'phone=' + encodeURIComponent(phone) + '&code=' + encodeURIComponent(smsCodeInput.value.trim())
-                    }).then(function(r) { return r.json(); });
+                    try {
+                        var response = await fetch('/apply/api/sms/verify/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRFToken': getCsrfToken()
+                            },
+                            body: 'phone=' + encodeURIComponent(phone) + '&code=' + encodeURIComponent(smsCodeInput.value.trim())
+                        });
+                        var verifyResult = await response.json();
+                        
+                        console.log('[验证码校验] 返回结果:', verifyResult);
 
-                    if (!verifyResult.success) {
-                        smsCodeInput.classList.add('is-invalid');
-                        var smsFeedback = smsCodeInput.nextElementSibling;
-                        if (!smsFeedback || !smsFeedback.classList.contains('invalid-feedback')) {
-                            smsFeedback = smsCodeInput.parentElement.querySelector('.invalid-feedback');
+                        if (!verifyResult.success) {
+                            smsCodeInput.classList.add('is-invalid');
+                            // 直接从父元素查找 invalid-feedback
+                            var smsFeedback = smsCodeInput.parentElement.querySelector('.invalid-feedback');
+                            if (smsFeedback) {
+                                smsFeedback.textContent = verifyResult.message;
+                                smsFeedback.style.display = 'block';
+                            }
+                            smsCodeInput.focus();
+                            return false;
                         }
+                    } catch (err) {
+                        console.error('[验证码校验] 请求失败:', err);
+                        smsCodeInput.classList.add('is-invalid');
+                        var smsFeedback = smsCodeInput.parentElement.querySelector('.invalid-feedback');
                         if (smsFeedback) {
-                            smsFeedback.textContent = verifyResult.message;
+                            smsFeedback.textContent = '验证码校验失败，请重试';
                             smsFeedback.style.display = 'block';
                         }
                         smsCodeInput.focus();
@@ -1390,6 +1404,61 @@
                 }
             }
             console.log('[DEBUG-H5] 手机号格式校验通过');
+
+            // ===== 4.5 验证码校验 =====
+            var smsCodeInput = document.querySelector('input[data-is-sms-code="true"]');
+            if (smsCodeInput) {
+                var isSmsRequired = smsCodeInput.getAttribute('data-sms-required') === 'true';
+                // 必填检查
+                if (isSmsRequired && !smsCodeInput.value.trim()) {
+                    smsCodeInput.classList.add('is-invalid');
+                    var smsFeedback = smsCodeInput.parentElement.querySelector('.invalid-feedback');
+                    if (smsFeedback) {
+                        smsFeedback.textContent = '请输入验证码';
+                        smsFeedback.style.display = 'block';
+                    }
+                    smsCodeInput.focus();
+                    return;
+                }
+                // 有值时调用后端校验
+                if (smsCodeInput.value.trim()) {
+                    var phoneInput = document.querySelector('input[data-is-phone="true"]');
+                    var phone = phoneInput ? phoneInput.value.trim() : '';
+                    try {
+                        var smsResponse = await fetch('/apply/api/sms/verify/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRFToken': getCsrfToken()
+                            },
+                            body: 'phone=' + encodeURIComponent(phone) + '&code=' + encodeURIComponent(smsCodeInput.value.trim())
+                        });
+                        var smsResult = await smsResponse.json();
+                        console.log('[DEBUG-H5] 验证码校验结果:', smsResult);
+                        if (!smsResult.success) {
+                            smsCodeInput.classList.add('is-invalid');
+                            var smsFeedback = smsCodeInput.parentElement.querySelector('.invalid-feedback');
+                            if (smsFeedback) {
+                                smsFeedback.textContent = smsResult.message;
+                                smsFeedback.style.display = 'block';
+                            }
+                            smsCodeInput.focus();
+                            return;
+                        }
+                    } catch (err) {
+                        console.error('[DEBUG-H5] 验证码校验请求失败:', err);
+                        smsCodeInput.classList.add('is-invalid');
+                        var smsFeedback = smsCodeInput.parentElement.querySelector('.invalid-feedback');
+                        if (smsFeedback) {
+                            smsFeedback.textContent = '验证码校验失败，请重试';
+                            smsFeedback.style.display = 'block';
+                        }
+                        smsCodeInput.focus();
+                        return;
+                    }
+                }
+                console.log('[DEBUG-H5] 验证码校验通过');
+            }
 
             // ===== 5. 格式字段重扫：金额 =====
             var amountInputs = document.querySelectorAll('input[data-is-amount="true"]');
